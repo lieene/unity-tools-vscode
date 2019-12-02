@@ -1,31 +1,28 @@
-# unityhelper README
+# Unity Helper README
 
-This is the README for your extension "unityhelper". After writing up a brief description, we recommend including the following sections.
+This extenstion is aim to speed up unity development.
+
+For now it just has add new file function with asmdef file parsing and template editing
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+### Usage
 
-For example if there is an image subfolder under your extension project workspace:
+press **F1** or **ctrl-shift-p** and type `addunityscript` and follow prompts
 
-\!\[feature X\]\(images/feature-x.png\)
+or
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+right click on file/folder in workspace and select  `Add Unity Script`
 
-## Requirements
+### Add New File
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- asmdef file parsing: new csharp script will be added to the csproj defined be it's controling asmdef file, or defulat("Assembly-CSharp/Assembly-CSharp-Editor") if it is not controled by and asmdef file.
+  
+- templating: when the extension run for the first time in the current unity project. it will generate 3 template for new file contents. These template are located in Asset\\ScriptTemplates. a asmref file will also be created in the folder. this template is never reference in Editor/Builds. but they can utilize linter as the asmdef creates a valid csproj. the rule for template is those with **".tpl.cs"** can be used in none-editor folder and **".tpl.editor.cs"** can be used in editor folder. and the text in the template that matches regex: **/\_.\*Name\_/** will be replaced by filename.
 
-## Extension Settings
+>template `public Class _someName\_{}` will be replace by `public Class NewFile\_{}` when created with the name **NewFile.cs**
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: enable/disable this extension
-* `myExtension.thing`: set to `blah` to do something
+---------
 
 ## Known Issues
 
@@ -47,19 +44,4 @@ Fixed issue #.
 
 Added features X, Y, and Z.
 
------------------------------------------------------------------------------------------------------------
-
-## Working with Markdown
-
-**Note:** You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+CMD+V` on macOS or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux) or `Cmd+Space` (macOS) to see a list of Markdown snippets
-
-### For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+---------

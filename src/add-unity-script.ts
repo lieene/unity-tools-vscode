@@ -34,35 +34,41 @@
  * Date      	By	Comments
  * ----------	---	----------------------------------------------------------
  */
+import * as vscode from "vscode";
 import * as yaml from "js-yaml";
+import * as xml from "xml-js";
 import * as fs from "fs";
 import * as Path from "path";
-import * as vscode from "vscode";
 import { promisify } from "util";
-export interface AddArg
-{
-  folder: string;
-  isEditor?: boolean;
-  template?: string;
-  factoryParams?: any[];
-}
 
 export function AddArg(folder: string, isEditor: boolean, template?: string, ...factoryParams: any[])
 {
   if (factoryParams && factoryParams.length === 0) { factoryParams = undefined as any; }
   return { folder, isEditor, template, factoryParams };
 }
+const exists = promisify(fs.exists);
+const readdir = promisify(fs.readdir);
+//const writeFile = promisify(fs.writeFile);
+const readFile = promisify(fs.readFile);
 
-export class AddUnityScript implements AddArg
+export class AddUnityScript
 {
-  constructor(arg?: AddArg)
+  folder: string;
+  basename?: string;
+  isEditor: boolean = false;
+  template?: string;
+  factoryParams?: any[];
+  isvalid: boolean;
+
+  unityPorjectRoot: string = '';
+  unityAssetRoot: string = '';
+  csProjectPath: string = '';
+
+  constructor(arg?: any)
   {
-    if (arg) 
+    if (arg)
     {
-      this.folder = Path.normalize(arg.folder);
-      this.isEditor = arg.isEditor;
-      this.template = arg.template;
-      this.factoryParams = arg.factoryParams;
+      this.folder = Path.normalize(arg.fsPath);
       this.isvalid = true;
     }
     else
@@ -77,15 +83,16 @@ export class AddUnityScript implements AddArg
       {
         this.folder = '';
         this.isvalid = false;
-        vscode.window.showInformationMessage("Please select a valid folder or file to add script.");
+        vscode.window.showWarningMessage("Please select a valid folder or file to add script.");
         return;
       }
     }
+
     let ws = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.folder));
     if (!ws) 
     {
       this.isvalid = false;
-      vscode.window.showInformationMessage("workspace is not located");
+      vscode.window.showWarningMessage("workspace is not located");
       return;
     }
     this.unityPorjectRoot = Path.normalize(ws.uri.fsPath);
@@ -95,93 +102,219 @@ export class AddUnityScript implements AddArg
       !fs.existsSync(this.unityAssetRoot))
     {
       this.isvalid = false;
-      vscode.window.showInformationMessage("workspace is not a valid unity project");
+      vscode.window.showWarningMessage("workspace is not a valid unity project");
       return;
     }
     if (!this.folder.startsWith(this.unityAssetRoot))
     {
       this.isvalid = false;
-      vscode.window.showInformationMessage("target folder is not part of unity assets");
+      vscode.window.showWarningMessage("target folder is not part of unity assets");
       return;
     }
+    this.isEditor = Path.relative(this.unityAssetRoot, this.folder).indexOf('\\Editor') >= 0;
   }
 
-  async Apply(): Promise<string>
+  async Apply()
   {
-    this.csProjectName = this.GetCsprojectName(this.folder)!;
-    if (!this.isvalid) { throw new Error("csproject not found"); }
-
+    this.GetCSprojectName(this.folder)
+      .then(async s =>
+      {
+        if (this.isvalid) 
+        {
+          this.csProjectPath = s;
+          return await this.buildFiles()
+            .then(add => this.writeFiles(...add)
+              .then(path => this.editCSProject(...path)
+                .then(rst => rst)));
+        }
+        else { throw new Error(`invalid add for some reason`); }
+      }).then(toOpen =>
+      {
+        vscode.workspace.openTextDocument(toOpen).then((textDocument) =>
+        {
+          if (!textDocument) { return; }
+          vscode.window.showTextDocument(textDocument).then((editor) =>
+          {
+            if (!editor) { return; }
+          });
+        });
+      }).catch(e => vscode.window.showWarningMessage(e.toString()));
   }
 
-
-  async GetCsprojectName(path: string): Promise<string>
+  async GetCSprojectName(path: string): Promise<string>
   {
     if (path.endsWith(".asmdef"))
     {
-      fs.exists(path, x =>
+      return exists(path).then(x =>
       {
-        if (x)
-        {
-          let doc = yaml.safeLoad(fs.readFileSync(path).toString());
-          doc.name;
-
-        }
-        else
-        {
-          this.isvalid = false;
-          throw new Error(`Asmdef file not found at: ${path}`);
-        }
+        if (x) { return this.retriveCsprojectPathFromYaml(path); }
+        else { return this.retriveCsprojectPathFromYaml(); } //get default csproject name
       });
     }
     else
     {
-      let pp = Path.parse(path);
-      pp.dir = path = `${pp.dir}\\${pp.name}`;
-      let found = false;
-      fs.readdir(path, (e, files) =>
+      if (this.csProjectPath.startsWith(path)) { return this.retriveCsprojectPathFromYaml(); }
+      else if (fs.lstatSync(path).isDirectory)
+      {
+        return readdir(path).then(files =>
+        {
+          for (let len = files.length, i = 0; i < len; i++)
+          {
+            let fn = files[i];
+            if (fn.endsWith(".asmdef"))
+            { return this.retriveCsprojectPathFromYaml(`${path}\\${fn}`); }
+          }
+          return this.GetCSprojectName(Path.dirname(path));
+        });
+      }
+      else { return this.GetCSprojectName(Path.dirname(path)); }
+    }
+  }
+
+  async retriveCsprojectPathFromYaml(yamlPath?: string): Promise<string>
+  {
+    if (yamlPath)
+    {
+      try
+      {
+        let doc = yaml.safeLoad((await readFile(yamlPath)).toString());
+        if (doc.name) { return `${this.unityPorjectRoot}\\${doc.name}.csproj`; }
+      }
+      catch (e) { vscode.window.showWarningMessage(`invalid asmdef file found at ${yamlPath} \n using default unity csprojects...`); }
+    }
+
+    if (this.isEditor) { return `${this.unityPorjectRoot}\\Assembly-CSharp.csproj`; }
+    else { return `${this.unityPorjectRoot}\\Assembly-CSharp-Editor.csproj`; }
+  }
+
+  async writeFiles(...filses: [string, any][]): Promise<string[]>
+  {
+    let out: string[] = [];
+    for (let i = 0, len = filses.length; i < len; i++)
+    {
+      let file = filses[i];
+      let path = file[0];
+      if (fs.existsSync(path))
+      { vscode.window.showWarningMessage(`file already exist at: ${path}`); }
+      else
+      {
+        try
+        {
+          fs.writeFileSync(path, file[1].toString());
+          if (path.endsWith('.cs')) { out.push(path); }
+        }
+        catch (e) { console.log(e); }
+      }
+    }
+    return out;
+  }
+
+  async editCSProject(...paths: string[]): Promise<string>
+  {
+    let xmlSrc = (await readFile(this.csProjectPath)).toString();
+    let root = xml.xml2js(xmlSrc);
+    let elem = root;
+    if (elem) { elem = (elem.elements as xml.Element[]).find((e) => e.name === 'Project')!; }
+    if (elem) { elem = (elem.elements as xml.Element[]).find((e) => e.name === 'ItemGroup')!; }
+    if (elem)
+    {
+      for (let i = 0, len = paths.length; i < len; i++)
+      {
+        let newElem: xml.Element = {} as xml.Element;
+        newElem.name = "Compile";
+        newElem.attributes = { Include: Path.relative(this.unityPorjectRoot, paths[i]) };
+        newElem.type = "element";
+        (elem.elements as xml.Element[]).push(newElem);
+      }
+      let out = xml.js2xml(root);
+      fs.writeFileSync(this.csProjectPath, out.split('><').join('>\n<'));
+      vscode.window.showInformationMessage([`Fils added to ${Path.basename(this.csProjectPath)}`, ...paths].join("\n\t"));
+
+
+      return paths.pop()!;
+    }
+    else { return `invalid csporj xml format`; }
+  }
+
+  async buildFiles(): Promise<[string, any][]>
+  {
+    let op: vscode.InputBoxOptions = {} as any;
+    op.value = "newscript.cs";
+    op.valueSelection = [0, 9];
+    op.prompt = "new file name";
+    op.ignoreFocusOut = true;
+    let filename = await vscode.window.showInputBox(op);
+    if (filename === undefined) { throw new Error("invalid file name"); }
+    filename = Path.basename(filename);
+    if (!filename.endsWith('.cs')) { filename = filename + '.cs'; }
+
+    let templatePath = await this.initOrGetTemplatPath();
+    let content = await this.loadTemplates(templatePath, this.isEditor).then(async tpls =>
+    {
+      let pick = await vscode.window.showQuickPick(tpls.map(t => t.split('.')[0]));
+      if (pick)
+      {
+        pick = tpls.find(t => t.startsWith(pick!))!;
+        return readFile(`${templatePath}\\${pick}`).then(c =>
+        { return c.toString(); });
+      }
+      else { throw new Error("add file canceled"); }
+    });
+
+    return [[`${this.folder}\\${filename}`, content.replace(/_.*Name_/g, Path.basename(filename, ".cs"))]];
+  }
+
+  async initOrGetTemplatPath(): Promise<string>
+  {
+    let templatePath = `${this.unityAssetRoot}\\ScriptTemplates`;
+    if (!fs.existsSync(templatePath)) { fs.mkdirSync(templatePath); }
+
+    let asmdefPath = `${templatePath}\\template.asmdef`;
+    if (!fs.existsSync(asmdefPath)) { fs.writeFileSync(asmdefPath, asmdefsrc); }
+
+    let monotplPath = `${templatePath}\\MonoBehaviour.tpl.cs`;
+    if (!fs.existsSync(monotplPath)) { fs.writeFileSync(monotplPath, MonoBehaviourTpl); }
+
+    let editortplPath = `${templatePath}\\Editor.tpl.editor.cs`;
+    if (!fs.existsSync(editortplPath)) { fs.writeFileSync(editortplPath, EditorTpl); }
+
+    let sotplPath = `${templatePath}\\ScriptableObject.tpl.cs`;
+    if (!fs.existsSync(sotplPath)) { fs.writeFileSync(sotplPath, ScriptableObjectTpl); }
+
+    return templatePath;
+  }
+
+  async loadTemplates(path: string, isEditor: boolean): Promise<string[]>
+  {
+    return readdir(path).then(files =>
+    {
+      let tpls: string[] = [];
+      if (isEditor)
       {
         for (let len = files.length, i = 0; i < len; i++)
         {
           let fn = files[i];
-          if (fn.endsWith(".asmdef")) { pp.base = fn; found = true; break; }
+          if (fn.endsWith("tpl.editor.cs")) { tpls.push(fn); }
         }
-        if (found)
+      }
+      else
+      {
+        for (let len = files.length, i = 0; i < len; i++)
         {
-          //console.log(`asmdef found in dir: ${pp.dir}`);
-          path = Path.format(pp);
+          let fn = files[i];
+          if (fn.endsWith("tpl.cs")) { tpls.push(fn); }
         }
-        else
-        {
-          //console.error(`asmdef Not found in dir: ${pp.dir}`);
-          return this.GetCsprojectName(Path.dirname(path));
-          //return undefined;
-        }
-      });
-
-      //else { console.log(`with .asmdef found at: ${path}`); }
-    }
+      }
+      return tpls;
+    });
   }
-
-  getDefualtCSProjectPath()
-  {
-  }
-  retriveCsprojectNameFromYaml(yamlPath: string)
-  {
-    let doc = yaml.safeLoad(fs.readFileSync(yamlPath).toString());
-    return doc.name;
-  }
-
-  folder: string;
-  isEditor?: boolean;
-  template?: string;
-  factoryParams?: any[];
-  isvalid: boolean;
-
-  unityPorjectRoot: string = '';
-  unityAssetRoot: string = '';
-  csProjectName: string = '';
 }
 
+const asmdefsrc = `{\n\t\"name": "template",\n\t\"references": [],\n\t\"includePlatforms": [],\n\t\"excludePlatforms": [],\n\t\"allowUnsafeCode": true,\n\t\"overrideReferences": false,\n\t\"precompiledReferences": [],\n\t\"autoReferenced": false,\n\t\"defineConstraints": [],\n\t\"versionDefines": []\n\}`;
+
+const MonoBehaviourTpl = "using UnityEngine;\npublic class _MonoName_ : MonoBehaviour\n{\n}";
+const EditorTpl = "using UnityEngine;\nusing UnityEditor;\n[CustomEditor(typeof(_MonoName_))]\npublic class _EditName_Editor : Editor\n{\n}";
+const ScriptableObjectTpl = "using UnityEngine;\n\npublic class _SOName_ : ScriptableObject\n{\n}";
 // export function GetUnityProjectFolder(path: string): string | undefined
 // {
 //   if (fs.lstatSync(path).isDirectory())
