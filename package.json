@@ -1,5 +1,6 @@
 {
 	"name": "unityhelper",
+	"publisher": "lieene",
 	"displayName": "UnityHelper",
 	"description": "unity tools for vscode",
 	"version": "0.0.2",
