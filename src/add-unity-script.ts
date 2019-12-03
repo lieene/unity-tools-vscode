@@ -290,7 +290,8 @@ export class AddUnityScript
           {
             let relPath = Path.relative(this.unityAssetRoot, this.folder);
             let rootIdx = relPath.lastIndexOf(replace.slice(1));
-            replace = relPath.slice(rootIdx).replace(/\\/g,".");
+            if (rootIdx < 0) { replace = replace.slice(1); }
+            else { replace = relPath.slice(rootIdx).replace(/\\/g, "."); }
           }
           else
           {
@@ -333,7 +334,7 @@ export class AddUnityScript
   {
     let templatePath = this.templatePath;
     // if (!fs.existsSync(templatePath)) { fs.mkdirSync(templatePath); }
-    let paramPath = `${templatePath}\\params.json`;
+    let paramPath = `${templatePath}\\variables.json`;
     let out: { [key: string]: string } = { $basename: basename };
     if (fs.existsSync(paramPath)) 
     {
@@ -376,9 +377,9 @@ export class AddUnityScript
 const asmdefsrc = `{\n\t\"name": "template",\n\t\"references": [],\n\t\"includePlatforms": [],\n\t\"excludePlatforms": [],\n\t\"allowUnsafeCode": true,\n\t\"overrideReferences": false,\n\t\"precompiledReferences": [],\n\t\"autoReferenced": false,\n\t\"defineConstraints": [],\n\t\"versionDefines": []\n\}`;
 
 const MonoBehaviourTpl = '//{"NewMono":"$basename"}\nusing UnityEngine;\npublic class NewMono : MonoBehaviour\n{\n}';
-const EditorTpl = '//{"Data":"Data Type Name"}\nusing UnityEngine;\nusing UnityEditor;\n[CustomEditor(typeof(Data))]\npublic class DataEditor : Editor\n{\n}';
-const ScriptableObjectTpl = '//{"NewScript":"$scriptname"}\nusing UnityEngine;\n\npublic class NewScript : ScriptableObject\n{\n}';
-const csharpClassObjectTpl = '//{"NewClass":"$basename","NameSpace":"#SRTK"}\nusing UnityEngine;\nnamespace NameSpace\n{\n  public class NewClass\n  {\n  }\n}';
+const EditorTpl = '//{"NewMono":"Data Type Name"}\nusing UnityEngine;\nusing UnityEditor;\n[CustomEditor(typeof(NewMono))]\npublic class NewMonoEditor : Editor\n{\n}';
+const ScriptableObjectTpl = '//{"NewScript":"$basename"}\nusing UnityEngine;\n\npublic class NewScript : ScriptableObject\n{\n}';
+const csharpClassObjectTpl = '//{"NewClass":"$basename","NameSpace":"$MyNameSpace"}\nusing UnityEngine;\nnamespace NameSpace\n{\n  public class NewClass\n  {\n  }\n}';
 
 // export function GetUnityProjectFolder(path: string): string | undefined
 // {

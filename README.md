@@ -18,7 +18,15 @@ right click on file/folder in workspace and select  `Add Unity Script`
 
 - asmdef file parsing: new csharp script will be added to the csproj defined be it's controling asmdef file, or defulat("Assembly-CSharp/Assembly-CSharp-Editor") if it is not controled by and asmdef file.
   
-- templating: when the extension run for the first time in the current unity project. it will generate 3 template for new file contents. These template are located in Asset\\ScriptTemplates. a asmref file will also be created in the folder. this template is never reference in Editor/Builds. but they can utilize linter as the asmdef creates a valid csproj. the rule for template is those with **".tpl.cs"** can be used in none-editor folder and **".tpl.editor.cs"** can be used in editor folder. and the text in the template that matches regex: **/\_.\*Name\_/** will be replaced by filename.
+- templating: when the extension run for the first time in the current unity project. it will generate 3 template for new file contents. These template are located in `\Asset\ScriptTemplates`. a asmref file will also be created in the folder. this template is never reference in Editor/Builds. but they can utilize linter as the asmdef creates a valid csproj.
+
+- the rule for template file name is: those with `.tpl.cs` can be used in none-editor folder and `.tpl.editor.cs` can be used in editor folder.
+  
+- template can has json replacement setting in the first line commnet.
+  - each key is a JS regex matching what to replace (globally in the template file).  
+  - value start with `$` is recognized as variable. $basename is built-in variable containing the new file name without extension. other variable can be defined in `variables.json` in `\Asset\ScriptTemplates`. if the variable is not found a input box will show up asking for user input.
+  - value start with `#` is relative path to namespace converter. path up-to the string value will be converted to dot spread namespace. if the value is not found up to `\Asset` folder. the string value it self will be returned.
+  - other string value will trigger a a input box for user input.
 
 >template `public Class _someName\_{}` will be replace by `public Class NewFile\_{}` when created with the name **NewFile.cs**
 
