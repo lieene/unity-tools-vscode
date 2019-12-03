@@ -3,7 +3,7 @@
 	"publisher": "lieene",
 	"displayName": "UnityHelper",
 	"description": "unity tools for vscode",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/lieene/unity-tools-vscode.git"
@@ -37,7 +37,7 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
-    "postversion": "git push && git push --tags",
+		"postversion": "git push && git push --tags",
 		"compile": "tsc -p ./",
 		"watch": "tsc -watch -p ./",
 		"pretest": "npm run compile",
