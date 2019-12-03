@@ -15,7 +15,8 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:extension.addunityscript"
+		"onCommand:extension.addunityscript",
+		"onCommand:extension.resetunityscripttemplate"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
@@ -23,6 +24,10 @@
 			{
 				"command": "extension.addunityscript",
 				"title": "Add Unity Script"
+			},
+			{
+				"command": "extension.resetunityscripttemplate",
+				"title": "Reset Unity Script Templates"
 			}
 		],
 		"menus": {

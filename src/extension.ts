@@ -15,12 +15,20 @@ export function activate(context: vscode.ExtensionContext)
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('extension.addunityscript', (arg?: any) =>
+	let addunityscript = vscode.commands.registerCommand('extension.addunityscript', (arg?: any) =>
 	{
 		let adder = new AddUnityScript(arg);
 		if (adder.isvalid) { adder.Apply(); }
 	});
-	context.subscriptions.push(disposable);
+	
+	let resetunityscripttemplate = vscode.commands.registerCommand('extension.resetunityscripttemplate', (arg?: any) =>
+	{
+		let adder = new AddUnityScript(arg);
+		if (adder.isvalid) { adder.initOrGetTemplatPath(true); }
+	});
+
+	context.subscriptions.push(addunityscript);
+	context.subscriptions.push(resetunityscripttemplate);
 }
 
 // this method is called when your extension is deactivated

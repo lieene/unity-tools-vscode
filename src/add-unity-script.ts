@@ -63,6 +63,7 @@ export class AddUnityScript
   unityPorjectRoot: string = '';
   unityAssetRoot: string = '';
   csProjectPath: string = '';
+  templatePath: string = '';
 
   constructor(arg?: any)
   {
@@ -111,6 +112,8 @@ export class AddUnityScript
       vscode.window.showWarningMessage("target folder is not part of unity assets");
       return;
     }
+
+    this.templatePath = `${this.unityAssetRoot}\\ScriptTemplates`;
     this.isEditor = Path.relative(this.unityAssetRoot, this.folder).indexOf('\\Editor') >= 0;
   }
 
@@ -264,23 +267,38 @@ export class AddUnityScript
     try
     {
       let firstlineEnd = content.indexOf('\n');
-      let placeholders: any = content.slice(2, firstlineEnd);
-      placeholders = JSON.parse(placeholders);
-      let replaces: Array<{ placeholder: string, param?: string, input?: string }> = placeholders.replace;
+      let rawRule: { [key: string]: string } = JSON.parse(content.slice(2, firstlineEnd));
       content = content.slice(firstlineEnd + 1);
-      for (let i = 0, len = replaces.length; i < len; i++)
+      let params = await this.loadParameters(Path.basename(filename, ".cs"));
+      for (const ptn in rawRule)
       {
-        let rep = replaces[i];
-        let newContent: string | undefined = undefined;
-        if (rep.input)
+        if (ptn)
         {
-          newContent = await vscode.window.showInputBox({ value: rep.placeholder, prompt: rep.input });
-          if (newContent === undefined) { throw new Error("user canceled"); }
+          let replace: string | undefined = rawRule[ptn];
+          if (replace === undefined) { throw new Error("Invalid replace JSON header"); }
+          if (replace.startsWith('$'))
+          {
+            let p = params[replace];
+            if (p) { replace = p; }
+            else//parameter not found
+            {
+              replace = await vscode.window.showInputBox({ value: ptn, prompt: replace });
+              if (replace === undefined) { throw new Error("user canceled"); }
+            }
+          }
+          else if (replace.startsWith('#'))
+          {
+            let relPath = Path.relative(this.unityAssetRoot, this.folder);
+            let rootIdx = relPath.lastIndexOf(replace.slice(1));
+            replace = relPath.slice(rootIdx).replace(/\\/g,".");
+          }
+          else
+          {
+            replace = await vscode.window.showInputBox({ value: ptn, prompt: replace });
+            if (replace === undefined) { throw new Error("user canceled"); }
+          }
+          content = content.replace(RegExp(ptn, 'g'), replace);
         }
-        else if (rep.param === "$basename")
-        { newContent = Path.basename(filename, ".cs"); }
-        if (newContent === undefined) { throw new Error("Invalid replace JSON header"); }
-        content = content.replace(RegExp(rep.placeholder,'g'), newContent);
       }
     }
     catch (e) { throw new Error("Placeholder script Failed"); }
@@ -288,27 +306,45 @@ export class AddUnityScript
     return [[`${this.folder}\\${filename}`, content]];
   }
 
-  async initOrGetTemplatPath(): Promise<string>
+  async initOrGetTemplatPath(forceReset: boolean = false): Promise<string>
   {
-    let templatePath = `${this.unityAssetRoot}\\ScriptTemplates`;
+    let templatePath = this.templatePath;
     if (!fs.existsSync(templatePath)) { fs.mkdirSync(templatePath); }
 
     let asmdefPath = `${templatePath}\\template.asmdef`;
-    if (!fs.existsSync(asmdefPath)) { fs.writeFileSync(asmdefPath, asmdefsrc); }
+    if (forceReset || !fs.existsSync(asmdefPath)) { fs.writeFileSync(asmdefPath, asmdefsrc); }
 
     let monotplPath = `${templatePath}\\MonoBehaviour.tpl.cs`;
-    if (!fs.existsSync(monotplPath)) { fs.writeFileSync(monotplPath, MonoBehaviourTpl); }
+    if (forceReset || !fs.existsSync(monotplPath)) { fs.writeFileSync(monotplPath, MonoBehaviourTpl); }
 
     let editortplPath = `${templatePath}\\Editor.tpl.editor.cs`;
-    if (!fs.existsSync(editortplPath)) { fs.writeFileSync(editortplPath, EditorTpl); }
+    if (forceReset || !fs.existsSync(editortplPath)) { fs.writeFileSync(editortplPath, EditorTpl); }
 
     let sotplPath = `${templatePath}\\ScriptableObject.tpl.cs`;
-    if (!fs.existsSync(sotplPath)) { fs.writeFileSync(sotplPath, ScriptableObjectTpl); }
+    if (forceReset || !fs.existsSync(sotplPath)) { fs.writeFileSync(sotplPath, ScriptableObjectTpl); }
 
     let cstplPath = `${templatePath}\\CSharpClass.tpl.cs`;
-    if (!fs.existsSync(cstplPath)) { fs.writeFileSync(cstplPath, csharpClassObjectTpl); }
+    if (forceReset || !fs.existsSync(cstplPath)) { fs.writeFileSync(cstplPath, csharpClassObjectTpl); }
 
     return templatePath;
+  }
+
+  async loadParameters(basename: string): Promise<{ [key: string]: string }>
+  {
+    let templatePath = this.templatePath;
+    // if (!fs.existsSync(templatePath)) { fs.mkdirSync(templatePath); }
+    let paramPath = `${templatePath}\\params.json`;
+    let out: { [key: string]: string } = { $basename: basename };
+    if (fs.existsSync(paramPath)) 
+    {
+      let params = JSON.parse(fs.readFileSync(paramPath).toString());
+      for (const key in params)
+      {
+        let k = key.startsWith('$') ? key : '$' + key;
+        if (k !== "$basename") { out[k] = params[key]; }
+      }
+    }
+    return out;
   }
 
   async loadTemplates(path: string, isEditor: boolean): Promise<string[]>
@@ -339,10 +375,11 @@ export class AddUnityScript
 
 const asmdefsrc = `{\n\t\"name": "template",\n\t\"references": [],\n\t\"includePlatforms": [],\n\t\"excludePlatforms": [],\n\t\"allowUnsafeCode": true,\n\t\"overrideReferences": false,\n\t\"precompiledReferences": [],\n\t\"autoReferenced": false,\n\t\"defineConstraints": [],\n\t\"versionDefines": []\n\}`;
 
-const MonoBehaviourTpl = '//{"replace":[{"placeholder":"NewMono","param":"$basename"}]}\nusing UnityEngine;\npublic class NewMono : MonoBehaviour\n{\n}';
-const EditorTpl = '//{"replace":[{"placeholder":"NewMono","param":"$basename"}]}\nusing UnityEngine;\nusing UnityEditor;\n[CustomEditor(typeof(NewMono))]\npublic class NewMonoEditor : Editor\n{\n}';
-const ScriptableObjectTpl = '//{"replace":[{"placeholder":"NewScript","param":"$basename"}]}\nusing UnityEngine;\n\npublic class NewScript : ScriptableObject\n{\n}';
-const csharpClassObjectTpl = '//{"replace":[{"placeholder":"NewClass","param":"$basename"},{"placeholder":"NameSpace","input":"namespace"}]}\nusing UnityEngine;\nnamespace NameSpace\n{\n  public class NewClass\n  {  \n}\n}';
+const MonoBehaviourTpl = '//{"NewMono":"$basename"}\nusing UnityEngine;\npublic class NewMono : MonoBehaviour\n{\n}';
+const EditorTpl = '//{"Data":"Data Type Name"}\nusing UnityEngine;\nusing UnityEditor;\n[CustomEditor(typeof(Data))]\npublic class DataEditor : Editor\n{\n}';
+const ScriptableObjectTpl = '//{"NewScript":"$scriptname"}\nusing UnityEngine;\n\npublic class NewScript : ScriptableObject\n{\n}';
+const csharpClassObjectTpl = '//{"NewClass":"$basename","NameSpace":"#SRTK"}\nusing UnityEngine;\nnamespace NameSpace\n{\n  public class NewClass\n  {\n  }\n}';
+
 // export function GetUnityProjectFolder(path: string): string | undefined
 // {
 //   if (fs.lstatSync(path).isDirectory())
@@ -368,3 +405,7 @@ const csharpClassObjectTpl = '//{"replace":[{"placeholder":"NewClass","param":"$
 //   }
 // }
 
+// let x = JSON.parse(`[	["NewClass", "$basename"],	["NameSpace", "namespace"]]`);
+// console.log(x);
+
+// console.log("some a and some b with somec".replace('some',"llll"));
