@@ -37,6 +37,7 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
+    "postversion": "git push && git push --tags",
 		"compile": "tsc -p ./",
 		"watch": "tsc -watch -p ./",
 		"pretest": "npm run compile",
