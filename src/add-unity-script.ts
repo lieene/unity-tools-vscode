@@ -153,7 +153,7 @@ export class AddUnityScript
     }
     else
     {
-      if (this.csProjectPath.startsWith(path)) { return this.retriveCsprojectPathFromYaml(); }
+      if (this.unityPorjectRoot.startsWith(path)) { return this.retriveCsprojectPathFromYaml(); }
       else if (fs.lstatSync(path).isDirectory())
       {
         return readdir(path).then(files =>
@@ -183,8 +183,8 @@ export class AddUnityScript
       catch (e) { vscode.window.showWarningMessage(`invalid asmdef file found at ${yamlPath} \n using default unity csprojects...`); }
     }
 
-    if (this.isEditor) { return `${this.unityPorjectRoot}\\Assembly-CSharp.csproj`; }
-    else { return `${this.unityPorjectRoot}\\Assembly-CSharp-Editor.csproj`; }
+    if (this.isEditor) { return `${this.unityPorjectRoot}\\Assembly-CSharp-Editor.csproj`; }
+    else { return `${this.unityPorjectRoot}\\Assembly-CSharp.csproj`; }
   }
 
   async writeFiles(...filses: [string, any][]): Promise<string[]>
@@ -280,7 +280,7 @@ export class AddUnityScript
         else if (rep.param === "$basename")
         { newContent = Path.basename(filename, ".cs"); }
         if (newContent === undefined) { throw new Error("Invalid replace JSON header"); }
-        content = content.replace(rep.placeholder, newContent);
+        content = content.replace(RegExp(rep.placeholder,'g'), newContent);
       }
     }
     catch (e) { throw new Error("Placeholder script Failed"); }
@@ -340,7 +340,7 @@ export class AddUnityScript
 const asmdefsrc = `{\n\t\"name": "template",\n\t\"references": [],\n\t\"includePlatforms": [],\n\t\"excludePlatforms": [],\n\t\"allowUnsafeCode": true,\n\t\"overrideReferences": false,\n\t\"precompiledReferences": [],\n\t\"autoReferenced": false,\n\t\"defineConstraints": [],\n\t\"versionDefines": []\n\}`;
 
 const MonoBehaviourTpl = '//{"replace":[{"placeholder":"NewMono","param":"$basename"}]}\nusing UnityEngine;\npublic class NewMono : MonoBehaviour\n{\n}';
-const EditorTpl = '//{"replace":[{"placeholder":"NewMono","param":"$basename"}]}\nusing UnityEngine;\nusing UnityEditor;\n[CustomEditor(typeof(NewMono))]\npublic class _MonoName_Editor : Editor\n{\n}';
+const EditorTpl = '//{"replace":[{"placeholder":"NewMono","param":"$basename"}]}\nusing UnityEngine;\nusing UnityEditor;\n[CustomEditor(typeof(NewMono))]\npublic class NewMonoEditor : Editor\n{\n}';
 const ScriptableObjectTpl = '//{"replace":[{"placeholder":"NewScript","param":"$basename"}]}\nusing UnityEngine;\n\npublic class NewScript : ScriptableObject\n{\n}';
 const csharpClassObjectTpl = '//{"replace":[{"placeholder":"NewClass","param":"$basename"},{"placeholder":"NameSpace","input":"namespace"}]}\nusing UnityEngine;\nnamespace NameSpace\n{\n  public class NewClass\n  {  \n}\n}';
 // export function GetUnityProjectFolder(path: string): string | undefined
