@@ -27,7 +27,7 @@ export class UnityProjectLoator
 {
   folder: string;
   isvalid: boolean;
-  unityPorjectRoot: string = '';
+  unityProjectRoot: string = '';
   unityAssetRoot: string = '';
 
   constructor(arg?: any)
@@ -61,10 +61,10 @@ export class UnityProjectLoator
       vscode.window.showWarningMessage("workspace is not located");
       return;
     }
-    this.unityPorjectRoot = Path.normalize(ws.uri.fsPath);
-    this.unityAssetRoot = `${this.unityPorjectRoot}\\Assets`;
+    this.unityProjectRoot = Path.normalize(ws.uri.fsPath);
+    this.unityAssetRoot = `${this.unityProjectRoot}\\Assets`;
 
-    if (!fs.existsSync(`${this.unityPorjectRoot}\\ProjectSettings\\ProjectVersion.txt`) ||
+    if (!fs.existsSync(`${this.unityProjectRoot}\\ProjectSettings\\ProjectVersion.txt`) ||
       !fs.existsSync(this.unityAssetRoot))
     {
       this.isvalid = false;
@@ -136,7 +136,7 @@ export class AddUnityScript extends UnityProjectLoator
     }
     else
     {
-      if (this.unityPorjectRoot.startsWith(path)) { return this.retriveCsprojectPathFromYaml(); }
+      if (this.unityProjectRoot.startsWith(path)) { return this.retriveCsprojectPathFromYaml(); }
       else if (fs.lstatSync(path).isDirectory())
       {
         return readdir(path).then(files =>
@@ -161,13 +161,13 @@ export class AddUnityScript extends UnityProjectLoator
       try
       {
         let doc = yaml.safeLoad((await readFile(yamlPath)).toString());
-        if (doc.name) { return `${this.unityPorjectRoot}\\${doc.name}.csproj`; }
+        if (doc.name) { return `${this.unityProjectRoot}\\${doc.name}.csproj`; }
       }
       catch (e) { vscode.window.showWarningMessage(`invalid asmdef file found at ${yamlPath} \n using default unity csprojects...`); }
     }
 
-    if (this.isEditor) { return `${this.unityPorjectRoot}\\Assembly-CSharp-Editor.csproj`; }
-    else { return `${this.unityPorjectRoot}\\Assembly-CSharp.csproj`; }
+    if (this.isEditor) { return `${this.unityProjectRoot}\\Assembly-CSharp-Editor.csproj`; }
+    else { return `${this.unityProjectRoot}\\Assembly-CSharp.csproj`; }
   }
 
   async writeFiles(...filses: [string, any][]): Promise<string[]>
@@ -205,7 +205,7 @@ export class AddUnityScript extends UnityProjectLoator
       {
         let newElem: xml.Element = {} as xml.Element;
         newElem.name = "Compile";
-        newElem.attributes = { Include: Path.relative(this.unityPorjectRoot, paths[i]) };
+        newElem.attributes = { Include: Path.relative(this.unityProjectRoot, paths[i]) };
         newElem.type = "element";
         (elem.elements as xml.Element[]).push(newElem);
       }
