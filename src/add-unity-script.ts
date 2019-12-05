@@ -23,7 +23,7 @@ const readdir = promisify(fs.readdir);
 //const writeFile = promisify(fs.writeFile);
 const readFile = promisify(fs.readFile);
 
-export class UnityProjectLoator
+export class UnityProjectLocator
 {
   folder: string;
   isvalid: boolean;
@@ -35,6 +35,8 @@ export class UnityProjectLoator
     if (arg)
     {
       this.folder = Path.normalize(arg.fsPath);
+      if (!fs.lstatSync(this.folder).isDirectory())
+      { this.folder = Path.dirname(this.folder); }
       this.isvalid = true;
     }
     else
@@ -47,20 +49,29 @@ export class UnityProjectLoator
       }
       else 
       {
-        this.folder = '';
+        this.folder = undefined as any;
         this.isvalid = false;
-        vscode.window.showWarningMessage("Please select a valid folder or file to add script.");
-        return;
       }
     }
 
-    let ws = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.folder));
+
+    let ws;
+    if (this.folder)
+    { ws = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.folder)); }
+    else
+    {
+      let wss = vscode.workspace.workspaceFolders;
+      if (wss) { ws = wss[0]; }
+    }
+
     if (!ws) 
     {
       this.isvalid = false;
       vscode.window.showWarningMessage("workspace is not located");
       return;
     }
+    else { this.isvalid = true; }
+
     this.unityProjectRoot = Path.normalize(ws.uri.fsPath);
     this.unityAssetRoot = `${this.unityProjectRoot}\\Assets`;
 
@@ -71,21 +82,16 @@ export class UnityProjectLoator
       vscode.window.showWarningMessage("workspace is not a valid unity project");
       return;
     }
-    if (!this.folder.startsWith(this.unityAssetRoot))
-    {
-      this.isvalid = false;
-      vscode.window.showWarningMessage("target folder is not part of unity assets");
-      return;
-    }
+
   }
 }
-export class AddUnityScript extends UnityProjectLoator
+export class AddUnityScript extends UnityProjectLocator
 {
   basename?: string;
   isEditor: boolean = false;
   template?: string;
   factoryParams?: any[];
-  
+
   csProjectPath: string = '';
   templatePath: string = '';
 
@@ -93,6 +99,13 @@ export class AddUnityScript extends UnityProjectLoator
   {
     super(arg);
 
+    if (!this.folder.startsWith(this.unityAssetRoot))
+    {
+      this.isvalid = false;
+      vscode.window.showWarningMessage("target folder is not part of unity assets");
+      return;
+    }
+    
     this.templatePath = `${this.unityAssetRoot}\\ScriptTemplates`;
     this.isEditor = Path.relative(this.unityAssetRoot, this.folder).indexOf('\\Editor') >= 0;
   }
