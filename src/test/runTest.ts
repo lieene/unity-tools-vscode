@@ -1,3 +1,11 @@
+// File: runTest.ts                                                                //
+// Project: lieene.UnityHelper                                                     //
+// Author: Lieene Guo                                                              //
+// MIT License, Copyright (c) 2019 Lieene@ShadeRealm                               //
+// Created Date: Mon Dec 2 2019                                                    //
+// Last Modified: Thu Dec 05 2019                                                  //
+// Modified By: Lieene Guo                                                         //
+
 import * as path from 'path';
 
 import { runTests } from 'vscode-test';

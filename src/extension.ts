@@ -1,3 +1,12 @@
+// File: extension.ts                                                              //
+// Project: lieene.UnityHelper                                                     //
+// Author: Lieene Guo                                                              //
+// MIT License, Copyright (c) 2019 Lieene@ShadeRealm                               //
+// Created Date: Mon Dec 2 2019                                                    //
+// Last Modified: Thu Dec 05 2019                                                  //
+// Modified By: Lieene Guo                                                         //
+
+
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
