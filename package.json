@@ -16,7 +16,8 @@
 	],
 	"activationEvents": [
 		"onCommand:extension.addunityscript",
-		"onCommand:extension.resetunityscripttemplate"
+		"onCommand:extension.resetunityscripttemplate",
+		"onCommand:extension.unityappversion"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
@@ -28,6 +29,10 @@
 			{
 				"command": "extension.resetunityscripttemplate",
 				"title": "Reset Unity Script Templates"
+			},
+			{
+				"command": "extension.unityappversion",
+				"title": "Unity App Version"
 			}
 		],
 		"menus": {
