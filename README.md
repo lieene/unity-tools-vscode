@@ -5,7 +5,7 @@ This extenstion is aim to speed up unity development.
 For now it has two features:
 
 - add new file function with asmdef file parsing and template editing
-- unity project version managing (git auto tag and pushing)
+- unity project version managing (version increament and git auto tag and pushing)
 
 ## Features
 
