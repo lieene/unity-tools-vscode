@@ -14,14 +14,12 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import * as simplegit from 'simple-git/promise';
-import { stringify } from 'querystring';
-import { SSL_OP_ALL } from 'constants';
 
 const git = simplegit();
 
 export enum VersionUpdateMode {
     Build,
-    Revision,
+    Patch,
     Minor,
     Major
 }
@@ -73,6 +71,7 @@ export class UnityAppVersion {
                 await git.add(".");
                 await git.commit("auto commit");
                 await git.push();
+                await git.pushTags();
             } else {
                 throw new Error(`git ${status.current} branch status not clean`);
             }
@@ -83,7 +82,7 @@ export class UnityAppVersion {
 
         let result = await vscode.window.showQuickPick([
             { label: 'Build', description: 'Build Number <0.0.0b[x]>', target: VersionUpdateMode.Build },
-            { label: 'Patch', description: 'Patch Number <0.0.[x]b0>', target: VersionUpdateMode.Revision },
+            { label: 'Patch', description: 'Patch Number <0.0.[x]b0>', target: VersionUpdateMode.Patch },
             { label: 'Minor', description: 'Minor Version Number <0.[x].0b0>', target: VersionUpdateMode.Minor },
             { label: 'Major', description: 'Major Version Number <[x].0.0b0>', target: VersionUpdateMode.Major },
         ], { placeHolder: "select mode" });
@@ -126,7 +125,7 @@ export class UnityAppVersion {
             for (let index = 0; index < 3; index++) {
                 let pos = settingsData.search("\n");
                 if (pos < 0) {
-                    throw new Error(`Setting is not invaild.filepath ${this.settingFilePath}`);
+                    throw new Error(`Setting is not invaild. filepath ${this.settingFilePath}`);
                 }
 
                 header += settingsData.slice(0, pos + 1);
@@ -166,6 +165,7 @@ export class UnityAppVersion {
             //提交
             progress.report({ increment: 95, message: "Git push ..." });
             await git.push();
+            await git.pushTags();
 
             //成功
             progress.report({ increment: 100, message: "Success." });
@@ -203,7 +203,7 @@ export class UnityAppVersion {
                 androidBundleVersionCode += 1;
                 buildNumberIOS += 1;
                 break;
-            case VersionUpdateMode.Revision:
+            case VersionUpdateMode.Patch:
                 patch += 1;
                 buildNumberIOS = 0;
                 androidBundleVersionCode += 1;
