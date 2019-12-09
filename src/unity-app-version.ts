@@ -14,6 +14,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import * as simplegit from 'simple-git/promise';
+import { resolve } from 'dns';
 
 const git = simplegit();
 
@@ -22,6 +23,32 @@ export enum VersionUpdateMode {
     Patch,
     Minor,
     Major
+}
+
+class Version {
+    major: number = 0;
+    minor: number = 0;
+    patch: number = 0;
+    androidBundleVersionCode: number = 0;
+    buildNumberIOS: number = 0;
+
+    constructor(version?: Version) {
+        if (version) {
+            this.major = version.major;
+            this.minor = version.minor;
+            this.patch = version.patch;
+            this.androidBundleVersionCode = version.androidBundleVersionCode;
+            this.buildNumberIOS = version.buildNumberIOS;
+        }
+    }
+
+    ToFullVersion(): string {
+        return `v${this.major}.${this.minor}.${this.patch}_${this.androidBundleVersionCode}.${this.buildNumberIOS}`;
+    }
+
+    ToBundleVersion(): string {
+        return `${this.major}.${this.minor}.${this.patch}`;
+    }
 }
 
 export class UnityAppVersion {
@@ -58,6 +85,7 @@ export class UnityAppVersion {
 
         return success;
     }
+
     async InitGit(workspaceFolder: string) {
         git.cwd(workspaceFolder);
         if (!git.checkIsRepo()) {
@@ -69,23 +97,28 @@ export class UnityAppVersion {
             let result = await vscode.window.showWarningMessage("Git repo is not clean, auto commit and push?", { modal: true }, { title: "Yes", target: true }, { title: "No", target: false });
             if (result && result.target) {
                 await git.add(".");
-                await git.commit("auto commit");
-                await git.push();
-                await git.pushTags();
+                let defaultCommitMessage: string = "Auto commit";
+                let commitMessage = await vscode.window.showInputBox({ value: defaultCommitMessage, placeHolder: defaultCommitMessage, prompt: "Commit message" });
+                if (commitMessage === undefined || commitMessage === "") {
+                    commitMessage = defaultCommitMessage;//给默认值
+                }
+                await git.commit(commitMessage);//commit
+                await git.push();//提交commits
+                await git.pushTags();//提交tags
             } else {
                 throw new Error(`git ${status.current} branch status not clean`);
             }
         }
     }
 
-    async SelectMode(): Promise<any> {
+    async SelectMode(oldVersion: Version): Promise<any> {
 
         let result = await vscode.window.showQuickPick([
-            { label: 'Build', description: 'Build Number <0.0.0b[x]>', target: VersionUpdateMode.Build },
-            { label: 'Patch', description: 'Patch Number <0.0.[x]b0>', target: VersionUpdateMode.Patch },
-            { label: 'Minor', description: 'Minor Version Number <0.[x].0b0>', target: VersionUpdateMode.Minor },
-            { label: 'Major', description: 'Major Version Number <[x].0.0b0>', target: VersionUpdateMode.Major },
-        ], { placeHolder: "select mode" });
+            { label: "Build", description: `Build Number <${this.UpdateVersion(oldVersion, VersionUpdateMode.Build).ToFullVersion()}>`, target: VersionUpdateMode.Build },
+            { label: "Patch", description: `Patch Number <${this.UpdateVersion(oldVersion, VersionUpdateMode.Patch).ToFullVersion()}>`, target: VersionUpdateMode.Patch },
+            { label: "Minor", description: `Minor Version Number <${this.UpdateVersion(oldVersion, VersionUpdateMode.Minor).ToFullVersion()}>`, target: VersionUpdateMode.Minor },
+            { label: "Major", description: `Major Version Number <${this.UpdateVersion(oldVersion, VersionUpdateMode.Major).ToFullVersion()}>`, target: VersionUpdateMode.Major },
+        ], { placeHolder: `Current Version ${oldVersion.ToFullVersion()}` });
 
         return result ? result.target : undefined;
     }
@@ -101,7 +134,6 @@ export class UnityAppVersion {
     }
 
     async Process(progress: vscode.Progress<{ message?: string | undefined; increment?: number | undefined; }>) {
-
         try {
             //初始化
             progress.report({ increment: 10, message: "Initializing ..." });
@@ -109,15 +141,10 @@ export class UnityAppVersion {
                 return;
             }
 
-            //选择模式
-            progress.report({ increment: 20, message: "Selecting mode ..." });
-            let mode = await this.SelectMode();
-            if (mode === undefined) {
-                return;
-            }
+            //文件 操作 ===========================================================================================
 
             //读取文件
-            progress.report({ increment: 30, message: "Read setting file ..." });
+            progress.report({ increment: 20, message: "Read setting file ..." });
             let settingsData = fs.readFileSync(this.settingFilePath).toString();
 
             //标准化yaml，移除头
@@ -133,105 +160,122 @@ export class UnityAppVersion {
             }
 
             //加载yaml
-            progress.report({ increment: 40, message: "Read yaml ..." });
+            progress.report({ increment: 26, message: "Read yaml ..." });
             let settings = yaml.safeLoad(settingsData);
+            let oldVersion = this.ReadVersion(settings);
+
+            //选择更新模式
+            progress.report({ increment: 30, message: "Selecting mode ..." });
+            let mode = await this.SelectMode(oldVersion);
+            if (mode === undefined) {
+                return;
+            }
 
             //更新配置
-            progress.report({ increment: 50, message: "Update setting ..." });
-            let infos = this.UpdateSettings(settings, mode);
+            progress.report({ increment: 34, message: "Update setting ..." });
+            let infos = this.UpdateSettings(settings, oldVersion, mode);
 
             //序列化，还原移除的头
-            progress.report({ increment: 60, message: "Write yaml ..." });
+            progress.report({ increment: 40, message: "Write yaml ..." });
             settingsData = header + yaml.safeDump(settings);
 
             //写入文件
-            progress.report({ increment: 70, message: "Write setting file ..." });
+            progress.report({ increment: 50, message: "Write setting file ..." });
             fs.writeFileSync(this.settingFilePath, settingsData);
 
+            //git 操作 ===========================================================================================
+
             //添加
-            progress.report({ increment: 80, message: "Git add setting file ..." });
+            progress.report({ increment: 60, message: "Git add setting file ..." });
             await git.add(this.settingFilePath).catch(e => { throw new Error(`Git Add ProjectSettings Error.\n${e}`); });
 
             //提交
-            progress.report({ increment: 90, message: "Git commit setting file ..." });
+            progress.report({ increment: 70, message: "Git commit setting file ..." });
 
-            let commitMsg = `Update version [${infos.oldVersion.major}.${infos.oldVersion.minor}.${infos.oldVersion.patch} build ${infos.oldVersion.androidBundleVersionCode}.${infos.oldVersion.buildNumberIOS}] to [${infos.newVersion.major}.${infos.newVersion.minor}.${infos.newVersion.patch} build ${infos.newVersion.androidBundleVersionCode}.${infos.newVersion.buildNumberIOS}]`;
+            let commitMsg = `Update version [${oldVersion.ToFullVersion()}] to [${infos.newVersion.ToFullVersion()}] `;
             await git.commit(commitMsg).catch(e => { throw new Error(`Git Commit ProjectSettings Error.\n${e}`); });
 
             //标签
-            progress.report({ increment: 95, message: "Git add tag ..." });
-            await git.addTag(`v${infos.newVersion.major}.${infos.newVersion.minor}.${infos.newVersion.patch}_${infos.newVersion.androidBundleVersionCode}.${infos.newVersion.buildNumberIOS}`).catch(e => { throw new Error(`Git add tag Error.\n${e}`); });
+            progress.report({ increment: 80, message: "Git add tag ..." });
+            await git.addTag(`${infos.newVersion.ToFullVersion()}`).catch(e => { throw new Error(`Git add tag Error.\n${e}`); });
 
             //提交
-            progress.report({ increment: 95, message: "Git push ..." });
-            await git.push();
-            await git.pushTags();
+            progress.report({ increment: 90, message: "Git push ..." });
+            await git.push();//提交commits
+            await git.pushTags();//提交tags
 
             //成功
             progress.report({ increment: 100, message: "Success." });
 
             //输出信息
             vscode.window.showInformationMessage(`${commitMsg}`);
-
-
         } catch (error) {
             vscode.window.showErrorMessage(`${error}`);
         }
     }
 
-    UpdateSettings(settings: any, mode: number): any {
+    ReadVersion(settings: any): Version {
+        //
+        let version: Version = new Version();
+
         //读取需要修改的配置
+        version.androidBundleVersionCode = settings.PlayerSettings.AndroidBundleVersionCode as number || 0;
+        version.buildNumberIOS = settings.PlayerSettings.buildNumber.iOS as number || 0;
+
         let bundleVersion = settings.PlayerSettings.bundleVersion;
         bundleVersion = bundleVersion !== undefined && bundleVersion.toString() || '';
-        let androidBundleVersionCode = settings.PlayerSettings.AndroidBundleVersionCode as number || 0;
-        let buildNumberIOS = settings.PlayerSettings.buildNumber.iOS as number || 0;
-        let major = 0;
-        let minor = 0;
-        let patch = 0;
-
-        let versionMatcher = bundleVersion.match(/(?<major>\d+).(?<minor>\d+)(.(?<patch>\d+))?/);
+        let versionMatcher = bundleVersion.match(/(?<major>\d+)\.(?<minor>\d+)(\.(?<patch>\d+))?/);
         if (versionMatcher && versionMatcher.groups) {
-            major = versionMatcher.groups.major && Number.parseInt(versionMatcher.groups.major) || 0;
-            minor = versionMatcher.groups.minor && Number.parseInt(versionMatcher.groups.minor) || 0;
-            patch = versionMatcher.groups.patch && Number.parseInt(versionMatcher.groups.patch) || 0;
+            version.major = versionMatcher.groups.major && Number.parseInt(versionMatcher.groups.major) || 0;
+            version.minor = versionMatcher.groups.minor && Number.parseInt(versionMatcher.groups.minor) || 0;
+            version.patch = versionMatcher.groups.patch && Number.parseInt(versionMatcher.groups.patch) || 0;
         }
 
-        let oldVersion = { major, minor, patch, androidBundleVersionCode, buildNumberIOS };
+        return version;
+    }
+
+    UpdateVersion(oldVersion: Version, mode: VersionUpdateMode): Version {
+
+        let newVersion: Version = new Version(oldVersion);
 
         switch (mode) {
             case VersionUpdateMode.Build:
-                androidBundleVersionCode += 1;
-                buildNumberIOS += 1;
+                newVersion.androidBundleVersionCode += 1;
+                newVersion.buildNumberIOS += 1;
                 break;
             case VersionUpdateMode.Patch:
-                patch += 1;
-                buildNumberIOS = 0;
-                androidBundleVersionCode += 1;
+                newVersion.patch += 1;
+                newVersion.buildNumberIOS = 0;
+                newVersion.androidBundleVersionCode += 1;
                 break;
             case VersionUpdateMode.Minor:
-                minor += 1;
-                patch = 0;
-                buildNumberIOS = 0;
-                androidBundleVersionCode += 1;
+                newVersion.minor += 1;
+                newVersion.patch = 0;
+                newVersion.buildNumberIOS = 0;
+                newVersion.androidBundleVersionCode += 1;
                 break;
             case VersionUpdateMode.Major:
-                major += 1;
-                minor = 0;
-                patch = 0;
-                buildNumberIOS = 0;
-                androidBundleVersionCode += 1;
+                newVersion.major += 1;
+                newVersion.minor = 0;
+                newVersion.patch = 0;
+                newVersion.buildNumberIOS = 0;
+                newVersion.androidBundleVersionCode += 1;
                 break;
         }
 
-        bundleVersion = `${major}.${minor}.${patch}`;
+        return newVersion;
+    }
+
+    UpdateSettings(settings: any, oldVersion: Version, mode: VersionUpdateMode): { newVersion: Version } {
+        //更新版本
+        let newVersion = this.UpdateVersion(oldVersion, mode);
 
         //写入需要修改的配置
-        settings.PlayerSettings.bundleVersion = bundleVersion;
-        settings.PlayerSettings.AndroidBundleVersionCode = androidBundleVersionCode;
-        settings.PlayerSettings.buildNumber.iOS = buildNumberIOS;
+        settings.PlayerSettings.bundleVersion = newVersion.ToBundleVersion();
+        settings.PlayerSettings.AndroidBundleVersionCode = newVersion.androidBundleVersionCode;
+        settings.PlayerSettings.buildNumber.iOS = newVersion.buildNumberIOS;
 
-        let newVersion = { major, minor, patch, androidBundleVersionCode, buildNumberIOS };
-
-        return { oldVersion, newVersion };
+        return { newVersion };
     }
+
 }
