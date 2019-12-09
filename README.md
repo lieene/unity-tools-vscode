@@ -2,7 +2,10 @@
 
 This extenstion is aim to speed up unity development.
 
-For now it just has add new file function with asmdef file parsing and template editing
+For now it has two features:
+
+- add new file function with asmdef file parsing and template editing
+- unity project version managing (git auto tag and pushing)
 
 ## Features
 
@@ -31,12 +34,15 @@ For now it just has add new file function with asmdef file parsing and template 
 
 >template `public Class _someName\_{}` will be replace by `public Class NewFile\_{}` when created with the name **NewFile.cs**
 
-### Unity Project version update
+### Unity Project version managing
 
 - optional add=>commit=>push git repo content
 - update unity project version (Major/Minor/Patch/Build)
 - added version tag to git project
 - submit version and tag to git repo
+- unity project version follows pattern Major.Minor.Patch and extra (IOS/Andriod) build number
+  - Increasing version number to the left will reset all version to the left to 0
+  - Android build number is a excetion as it need to be unique not it self so it is never rested
 
 ---------
 
