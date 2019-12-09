@@ -3,7 +3,7 @@
 	"publisher": "lieene",
 	"displayName": "UnityHelper",
 	"description": "unity tools for vscode",
-	"version": "0.2.3",
+	"version": "0.2.4",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/lieene/unity-tools-vscode.git"
