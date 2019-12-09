@@ -3,7 +3,7 @@
 // Author: Lieene Guo                                                              //
 // MIT License, Copyright (c) 2019 Lieene@ShadeRealm                               //
 // Created Date: Mon Dec 2 2019                                                    //
-// Last Modified: Thu Dec 05 2019                                                  //
+// Last Modified: Mon Dec 09 2019                                                  //
 // Modified By: Lieene Guo                                                         //
 
 import * as vscode from "vscode";
@@ -105,7 +105,7 @@ export class AddUnityScript extends UnityProjectLocator
       vscode.window.showWarningMessage("target folder is not part of unity assets");
       return;
     }
-    
+
     this.templatePath = `${this.unityAssetRoot}\\ScriptTemplates`;
     this.isEditor = Path.relative(this.unityAssetRoot, this.folder).indexOf('\\Editor') >= 0;
   }
@@ -143,13 +143,13 @@ export class AddUnityScript extends UnityProjectLocator
     {
       return exists(path).then(x =>
       {
-        if (x) { return this.retriveCsprojectPathFromYaml(path); }
-        else { return this.retriveCsprojectPathFromYaml(); } //get default csproject name
+        if (x) { return this.retriveCsprojectPathFromJSON(path); }
+        else { return this.retriveCsprojectPathFromJSON(); } //get default csproject name
       });
     }
     else
     {
-      if (this.unityProjectRoot.startsWith(path)) { return this.retriveCsprojectPathFromYaml(); }
+      if (this.unityProjectRoot.startsWith(path)) { return this.retriveCsprojectPathFromJSON(); }
       else if (fs.lstatSync(path).isDirectory())
       {
         return readdir(path).then(files =>
@@ -158,7 +158,7 @@ export class AddUnityScript extends UnityProjectLocator
           {
             let fn = files[i];
             if (fn.endsWith(".asmdef"))
-            { return this.retriveCsprojectPathFromYaml(`${path}\\${fn}`); }
+            { return this.retriveCsprojectPathFromJSON(`${path}\\${fn}`); }
           }
           return this.GetCSprojectName(Path.dirname(path));
         });
@@ -167,16 +167,16 @@ export class AddUnityScript extends UnityProjectLocator
     }
   }
 
-  async retriveCsprojectPathFromYaml(yamlPath?: string): Promise<string>
+  async retriveCsprojectPathFromJSON(jsonPath?: string): Promise<string>
   {
-    if (yamlPath)
+    if (jsonPath)
     {
       try
       {
-        let doc = yaml.safeLoad((await readFile(yamlPath)).toString());
+        let doc = JSON.parse((await readFile(jsonPath)).toString());
         if (doc.name) { return `${this.unityProjectRoot}\\${doc.name}.csproj`; }
       }
-      catch (e) { vscode.window.showWarningMessage(`invalid asmdef file found at ${yamlPath} \n using default unity csprojects...`); }
+      catch (e) { vscode.window.showWarningMessage(`invalid asmdef file found at ${jsonPath} \n using default unity csprojects...`); }
     }
 
     if (this.isEditor) { return `${this.unityProjectRoot}\\Assembly-CSharp-Editor.csproj`; }
