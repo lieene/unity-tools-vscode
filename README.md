@@ -8,11 +8,12 @@ For now it just has add new file function with asmdef file parsing and template 
 
 ### Usage
 
-press **F1** or **ctrl-shift-p** and type `addunityscript` and follow prompts
+- to add New file
 
-or
+  press `F1` or `ctrl+shift+p` and type `addunityscript` / right click on file/folder in workspace and select  `Add Unity Script` and follow prompts
+- to update unity version
+  press `F1` or `ctrl+shift+p` and type `unityappversion` and follow prompts
 
-right click on file/folder in workspace and select  `Add Unity Script`
 
 ### Add New File
 
@@ -29,6 +30,13 @@ right click on file/folder in workspace and select  `Add Unity Script`
   - other string value will trigger a a input box for user input.
 
 >template `public Class _someName\_{}` will be replace by `public Class NewFile\_{}` when created with the name **NewFile.cs**
+
+### Unity Project version update
+
+- optional add=>commit=>push git repo content
+- update unity project version (Major/Minor/Patch/Build)
+- added version tag to git project
+- submit version and tag to git repo
 
 ---------
 
