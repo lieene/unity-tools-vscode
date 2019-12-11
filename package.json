@@ -17,7 +17,8 @@
 	"activationEvents": [
 		"onCommand:extension.addunityscript",
 		"onCommand:extension.resetunityscripttemplate",
-		"onCommand:extension.unityappversion"
+		"onCommand:extension.unityappversion",
+		"onCommand:extension.unityprojectupdate"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
@@ -33,6 +34,10 @@
 			{
 				"command": "extension.unityappversion",
 				"title": "Unity App Version"
+			},
+			{
+				"command": "extension.unityprojectupdate",
+				"title": "Unity Project Update"
 			}
 		],
 		"menus": {
@@ -49,9 +54,9 @@
 		"vscode:prepublish": "npm run compile",
 		"postversion": "git push && git push --tags",
 		"compile": "tsc -p ./",
-		"watch": "tsc -watch -p ./",
+		"watch": "npm run compile",
 		"pretest": "npm run compile",
-		"test": "tsc && node ./out/test/runTest.js"
+		"test": "npm run compile && node ./out/test/runTest.js"
 	},
 	"devDependencies": {
 		"@types/glob": "^7.1.1",

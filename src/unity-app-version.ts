@@ -3,7 +3,7 @@
 // Author: Peter Xiang                                                             //
 // MIT License, Copyright (c) 2019 PeterXiang@ShadeRealm                           //
 // Created Date: Thu Dec 5 2019                                                    //
-// Last Modified: Mon Dec 09 2019                                                  //
+// Last Modified: Tue Dec 10 2019                                                  //
 // Modified By: Peter Xiang                                                        //
 
 //help info
@@ -14,7 +14,6 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import * as simplegit from 'simple-git/promise';
-import { resolve } from 'dns';
 
 const git = simplegit();
 
@@ -63,7 +62,7 @@ export class UnityAppVersion {
         try {
             let workspaceFolders = vscode.workspace.workspaceFolders;
             if (workspaceFolders === undefined) {
-                throw new Error(`please open unity project`);
+                throw new Error(`Please open unity project`);
             }
 
             let workspaceFolder = workspaceFolders[0].uri.fsPath;
@@ -72,7 +71,7 @@ export class UnityAppVersion {
 
             fs.exists(this.settingFilePath, t => {
                 if (!t) {
-                    throw new Error(`not found ${this.settingFilePath}`);
+                    throw new Error(`Not found ${this.settingFilePath}`);
                 }
             });
 

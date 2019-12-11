@@ -3,7 +3,7 @@
 // Author: Lieene Guo                                                              //
 // MIT License, Copyright (c) 2019 Lieene@ShadeRealm                               //
 // Created Date: Mon Dec 2 2019                                                    //
-// Last Modified: Fri Dec 06 2019                                                  //
+// Last Modified: Tue Dec 10 2019                                                  //
 // Modified By: Peter Xiang                                                        //
 
 
@@ -12,6 +12,7 @@
 import * as vscode from 'vscode';
 import { AddUnityScript, AddArg } from "./add-unity-script";
 import { UnityAppVersion } from "./unity-app-version";
+import { UnityProjectUpdate } from "./unity-project-update";
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -39,9 +40,15 @@ export function activate(context: vscode.ExtensionContext) {
 		adder.Apply();
 	});
 
+	let unityprojectupdate = vscode.commands.registerCommand('extension.unityprojectupdate', (arg?: any) => {
+		let adder = new UnityProjectUpdate(arg);
+		adder.Apply();
+	});
+
 	context.subscriptions.push(addunityscript);
 	context.subscriptions.push(resetunityscripttemplate);
 	context.subscriptions.push(unityappversion);
+	context.subscriptions.push(unityprojectupdate);
 }
 
 // this method is called when your extension is deactivated

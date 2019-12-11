@@ -3,8 +3,8 @@
 // Author: Lieene Guo                                                              //
 // MIT License, Copyright (c) 2019 Lieene@ShadeRealm                               //
 // Created Date: Mon Dec 2 2019                                                    //
-// Last Modified: Mon Dec 09 2019                                                  //
-// Modified By: Lieene Guo                                                         //
+// Last Modified: Wed Dec 11 2019                                                  //
+// Modified By: Peter Xiang                                                        //
 
 import * as vscode from "vscode";
 import * as yaml from "js-yaml";
@@ -173,7 +173,7 @@ export class AddUnityScript extends UnityProjectLocator
     {
       try
       {
-        let doc = JSON.parse((await readFile(jsonPath)).toString());
+        let doc = JSON.parse((await readFile(jsonPath)).toString().trim());
         if (doc.name) { return `${this.unityProjectRoot}\\${doc.name}.csproj`; }
       }
       catch (e) { vscode.window.showWarningMessage(`invalid asmdef file found at ${jsonPath} \n using default unity csprojects...`); }
