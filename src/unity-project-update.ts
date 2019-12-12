@@ -3,7 +3,7 @@
 // Author: Peter Xiang                                                             //
 // MIT License, Copyright (c) 2019 PeterXiang@ShadeRealm                           //
 // Created Date: Tue Dec 10 2019                                                   //
-// Last Modified: Wed Dec 11 2019                                                  //
+// Last Modified: Thu Dec 12 2019                                                  //
 // Modified By: Peter Xiang                                                        //
 
 
@@ -110,19 +110,26 @@ export class UnityProjectUpdate {
         try {
 
             //初始化
+            progress.report({ increment: 20, message: "Initializing ..." });
             await this.Init();
 
             //构建资源
+            progress.report({ increment: 40, message: "Build assets tree ..." });
             let buildData = await this.BuildAssets();
 
             //整理资源
+            progress.report({ increment: 60, message: "Load project files ..." });
             let projData = await this.LoadProjectFiles(buildData);
 
             //更新配置
+            progress.report({ increment: 80, message: "Update project files ..." });
             await this.UpdateProjectsFiles(projData);
 
+            //完成
+            progress.report({ increment: 100, message: "Success ..." });
+
             //输出信息
-            vscode.window.showInformationMessage(`Unity Update Project Success.`);
+            vscode.window.showInformationMessage(`Unity Project Update Success.`);
         } catch (error) {
             vscode.window.showErrorMessage(`${error}`);
             console.log(error);
@@ -184,7 +191,6 @@ export class UnityProjectUpdate {
             }
 
             //添加需要的节点
-
             for (let subElem of elem.elements as xml.Element[]) {
                 if (subElem.name === "Compile") {
                     continue;
@@ -210,7 +216,7 @@ export class UnityProjectUpdate {
 
         let defaultProjPath = this.GetProjectFilePath(buildData.defaultAssmblyName);
         if (buildData.files.length > 0) {
-            if (!fs.existsSync(defaultProjPath)) {
+            if (!fs.existsSync(defaultProjPath)) {//检查文件是否存在
                 throw new Error(`Not found project file:${defaultProjPath}`);
             }
 
@@ -219,7 +225,7 @@ export class UnityProjectUpdate {
 
         let defaultEditorProjPath = this.GetProjectFilePath(buildData.defaultEditorAssmblyName);
         if (buildData.editorFiles.length > 0) {
-            if (!fs.existsSync(defaultProjPath)) {
+            if (!fs.existsSync(defaultProjPath)) {//检查文件是否存在
                 throw new Error(`Not found project file:${defaultEditorProjPath}`);
             }
 
@@ -234,6 +240,9 @@ export class UnityProjectUpdate {
             const asmData = buildData.assemblyGuids[key];
 
             let projPath = this.GetProjectFilePath(asmData.name);
+            if (!fs.existsSync(projPath)) {//检查文件是否存在
+                throw new Error(`Not found project file:${projPath}`);
+            }
 
             projectFiles[projPath] = asmData.files;
         }
