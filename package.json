@@ -3,6 +3,7 @@
 	"publisher": "lieene",
 	"displayName": "UnityHelper",
 	"description": "unity tools for vscode",
+	"license": "MIT",
 	"version": "0.2.4",
 	"repository": {
 		"type": "git",
