@@ -3,7 +3,7 @@
 // Author: Peter Xiang                                                             //
 // MIT License, Copyright (c) 2019 PeterXiang@ShadeRealm                           //
 // Created Date: Thu Dec 5 2019                                                    //
-// Last Modified: Tue Dec 10 2019                                                  //
+// Last Modified: Mon Dec 30 2019                                                  //
 // Modified By: Peter Xiang                                                        //
 
 //help info
@@ -146,6 +146,8 @@ export class UnityAppVersion {
             progress.report({ increment: 20, message: "Read setting file ..." });
             let settingsData = fs.readFileSync(this.settingFilePath).toString();
 
+
+            /*
             //标准化yaml，移除头
             let header = "";
             for (let index = 0; index < 3; index++) {
@@ -162,6 +164,10 @@ export class UnityAppVersion {
             progress.report({ increment: 26, message: "Read yaml ..." });
             let settings = yaml.safeLoad(settingsData);
             let oldVersion = this.ReadVersion(settings);
+            */
+            progress.report({ increment: 26, message: "Read version ..." });
+            let oldVersion = this.ReadVersion2(settingsData);
+            //
 
             //选择更新模式
             progress.report({ increment: 30, message: "Selecting mode ..." });
@@ -170,6 +176,7 @@ export class UnityAppVersion {
                 return;
             }
 
+            /*
             //更新配置
             progress.report({ increment: 34, message: "Update setting ..." });
             let infos = this.UpdateSettings(settings, oldVersion, mode);
@@ -177,10 +184,14 @@ export class UnityAppVersion {
             //序列化，还原移除的头
             progress.report({ increment: 40, message: "Write yaml ..." });
             settingsData = header + yaml.safeDump(settings);
+            */
+            progress.report({ increment: 34, message: "Update setting ..." });
+            let infos = this.UpdateSettings2(settingsData, oldVersion, mode);
+            //
 
             //写入文件
             progress.report({ increment: 50, message: "Write setting file ..." });
-            fs.writeFileSync(this.settingFilePath, settingsData);
+            fs.writeFileSync(this.settingFilePath, infos.settings);
 
             //git 操作 ===========================================================================================
 
@@ -213,15 +224,65 @@ export class UnityAppVersion {
         }
     }
 
+    RegAndroidBundleVersionCode: RegExp = /AndroidBundleVersionCode: (?<AndroidBundleVersionCode>.*)/;
+    RegBundleVersion: RegExp = /bundleVersion: (?<bundleVersion>.*)/;
+    RegBuildNumber1: RegExp = /iOS: (?<buildNumberiOS>.*)/;
+    RegBuildNumber2: RegExp = /iPhone: (?<buildNumberiPhone>.*)/;
+    RegVersion: RegExp = /(?<major>\d+)\.(?<minor>\d+)(\.(?<patch>\d+))?/;
+
+    ReadVersion2(settings: string): Version {
+        let version: Version = new Version();
+
+        let d1 = settings.match(this.RegAndroidBundleVersionCode);
+        if (d1 && d1.groups) {
+            version.androidBundleVersionCode = d1.groups.AndroidBundleVersionCode && Number.parseInt(d1.groups.AndroidBundleVersionCode) || 0;
+        }
+
+        let d2 = settings.match(this.RegBundleVersion);
+        if (d2 && d2.groups) {
+            let bundleVersion: string = d2.toString();
+            let versionMatcher = bundleVersion.match(this.RegVersion);
+            if (versionMatcher && versionMatcher.groups) {
+                version.major = versionMatcher.groups.major && Number.parseInt(versionMatcher.groups.major) || 0;
+                version.minor = versionMatcher.groups.minor && Number.parseInt(versionMatcher.groups.minor) || 0;
+                version.patch = versionMatcher.groups.patch && Number.parseInt(versionMatcher.groups.patch) || 0;
+            }
+        }
+
+        let d3 = settings.match(this.RegBuildNumber1);
+        let d4 = settings.match(this.RegBuildNumber2);
+        if (d3 && d3.groups) {
+            version.buildNumberIOS = d3.groups.buildNumberiOS && Number.parseInt(d3.groups.buildNumberiOS) || 0;
+        } else if (d4 && d4.groups) {
+            version.buildNumberIOS = d4.groups.buildNumberiPhone && Number.parseInt(d4.groups.buildNumberiPhone) || 0;
+        }
+
+        return version;
+    }
+
+
+    UpdateSettings2(settings: string, oldVersion: Version, mode: VersionUpdateMode): { newVersion: Version, settings: string } {
+        //更新版本
+        let newVersion = this.UpdateVersion(oldVersion, mode);
+
+        //写入需要修改的配置
+        settings = settings.replace(this.RegAndroidBundleVersionCode, `AndroidBundleVersionCode: ${newVersion.androidBundleVersionCode.toString()}`);
+        settings = settings.replace(this.RegBundleVersion, `bundleVersion: ${newVersion.ToBundleVersion()}`);
+        settings = settings.replace(this.RegBuildNumber1, `iOS: ${newVersion.buildNumberIOS.toString()}`);
+        settings = settings.replace(this.RegBuildNumber2, `iPhone: ${newVersion.buildNumberIOS.toString()}`);
+
+        return { newVersion, settings };
+    }
+
     ReadVersion(settings: any): Version {
         //
         let version: Version = new Version();
 
         //读取需要修改的配置
         version.androidBundleVersionCode = settings.PlayerSettings.AndroidBundleVersionCode as number || 0;
-        version.buildNumberIOS = settings.PlayerSettings.buildNumber.iOS as number || 0;
-
+        version.buildNumberIOS = settings.PlayerSettings.buildNumber.iOS as number || settings.PlayerSettings.buildNumber.iPhone as number || 0;
         let bundleVersion = settings.PlayerSettings.bundleVersion;
+
         bundleVersion = bundleVersion !== undefined && bundleVersion.toString() || '';
         let versionMatcher = bundleVersion.match(/(?<major>\d+)\.(?<minor>\d+)(\.(?<patch>\d+))?/);
         if (versionMatcher && versionMatcher.groups) {
@@ -272,7 +333,12 @@ export class UnityAppVersion {
         //写入需要修改的配置
         settings.PlayerSettings.bundleVersion = newVersion.ToBundleVersion();
         settings.PlayerSettings.AndroidBundleVersionCode = newVersion.androidBundleVersionCode;
-        settings.PlayerSettings.buildNumber.iOS = newVersion.buildNumberIOS;
+
+        if (settings.PlayerSettings.buildNumber.iOS !== undefined) {
+            settings.PlayerSettings.buildNumber.iOS = newVersion.buildNumberIOS;
+        } else if (settings.PlayerSettings.buildNumber.iPhone !== undefined) {
+            settings.PlayerSettings.buildNumber.iPhone = newVersion.buildNumberIOS;
+        }
 
         return { newVersion };
     }
