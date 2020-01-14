@@ -29,7 +29,8 @@ import { promises } from 'dns';
 export enum BuildType {
     Windows,
     IOS,
-    Android
+    Android,
+    OSX
 }
 
 export class UnityProjectBuild {
@@ -112,6 +113,10 @@ export class UnityProjectBuild {
                 methodName = "UnityHelper.Builder.Windows";
                 buildPath = path.join(this.buildPath, "Windows");
                 break;
+            case BuildType.OSX:
+                methodName = "UnityHelper.Builder.OSX";
+                buildPath = path.join(this.buildPath, "OSX");
+                break;
         }
 
         let logPath = path.join(buildPath, "build.log");
@@ -151,6 +156,11 @@ export class UnityProjectBuild {
         //check file
         let filePath = path.join(this.projectRoot, "Assets/Editor/UnityHelper.cs");
         if (!fs.existsSync(filePath)) {
+            let dirPath = path.dirname(filePath);
+            if (!fs.existsSync(dirPath)) {
+                fs.mkdirSync(dirPath);
+            }
+
             fs.writeFileSync(filePath, this.helpScript);
         }
         //
@@ -159,9 +169,10 @@ export class UnityProjectBuild {
     async SelectMode(): Promise<BuildType | undefined> {
 
         let result = await vscode.window.showQuickPick([
-            { label: "Windows", description: `Windows`, target: BuildType.Windows },
-            { label: "IOS", description: `IOS`, target: BuildType.IOS },
-            { label: "Android", description: `Android`, target: BuildType.Android },
+            { label: "Windows", description: `Windows Platform`, target: BuildType.Windows },
+            { label: "OSX", description: `OSX Platform`, target: BuildType.OSX },
+            { label: "IOS", description: `IOS Platform`, target: BuildType.IOS },
+            { label: "Android", description: `Android Platform`, target: BuildType.Android },
         ], { placeHolder: `Build Platform Select` });
 
         return result ? result.target : undefined;
@@ -180,5 +191,5 @@ export class UnityProjectBuild {
         return result;
     }
 
-    helpScript: string = "using System;\nusing System.IO;\nusing UnityEditor;\nusing UnityEditor.Build.Reporting;\n\nnamespace UnityHelper\n{\n    public static class Builder\n    {\n        enum ExitCode\n        {\n            Succeeded = 0,\n            Unknown = 1,\n            Failed = 2,\n            Cancelled = 3,\n            Error = 4,\n        }\n\n        static string buildPath = string.Empty;\n\n        private static void Init()\n        {\n            try\n            {\n                string path = string.Empty;\n                string[] commands = System.Environment.GetCommandLineArgs();\n                for (int i = 0; i < commands.Length; i++)\n                {\n                    if (string.Compare(commands[i], \"-buildPath\", true) == 0)\n                    {\n                        path = commands[i + 1];\n                        break;\n                    }\n                }\n                if (string.IsNullOrEmpty(path))\n                {\n                    throw new Exception(\"-buildPath is invaild.\");\n                }\n\n                buildPath = path;\n            }\n            catch (Exception)\n            {\n                EditorApplication.Exit((int)ExitCode.Error);\n            }\n        }\n\n        public static string GetPath(BuildTarget target)\n        {\n            string path = string.Empty;\n\n            if (target == BuildTarget.StandaloneWindows)\n            {\n                path = Path.Combine(buildPath, $\"{PlayerSettings.productName}.exe\");\n            }\n\n            return path;\n        }\n\n        private static void Build(BuildTarget target, BuildOptions options)\n        {\n            Init();\n            string outPath = GetPath(target);\n            BuildReport report = BuildPipeline.BuildPlayer(EditorBuildSettings.scenes, outPath, target, options);\n            CompleteBuild(report, target);\n        }\n\n        private static void CompleteBuild(BuildReport report, BuildTarget standaloneWindows)\n        {\n            BuildSummary summary = report.summary;\n            ExitCode result = ExitCode.Failed;\n            switch (summary.result)\n            {\n                case BuildResult.Unknown:\n                    result = ExitCode.Unknown;\n                    break;\n                case BuildResult.Failed:\n                    result = ExitCode.Failed;\n                    break;\n                case BuildResult.Cancelled:\n                    result = ExitCode.Cancelled;\n                    break;\n                case BuildResult.Succeeded:\n                    result = ExitCode.Succeeded;\n                    break;\n            }\n\n            EditorApplication.Exit((int)result);\n        }\n\n        public static void Windows()\n        {\n            Build(BuildTarget.StandaloneWindows, BuildOptions.None);\n        }\n\n        public static void Android()\n        {\n            Build(BuildTarget.Android, BuildOptions.None);\n        }\n\n        public static void IOS()\n        {\n            Build(BuildTarget.iOS, BuildOptions.None);\n        }\n    }\n}\n";
+    helpScript: string = "using System;\nusing System.IO;\nusing UnityEditor;\nusing UnityEditor.Build.Reporting;\nusing UnityEngine;\n\nnamespace UnityHelper\n{\n    public static class Builder\n    {\n        enum ExitCode\n        {\n            Succeeded = 0,\n            Unknown = 1,\n            Failed = 2,\n            Cancelled = 3,\n            Error = 4,\n        }\n\n        static string buildPath = string.Empty;\n\n        private static void Init()\n        {\n            try\n            {\n                string path = string.Empty;\n                string[] commands = System.Environment.GetCommandLineArgs();\n                for (int i = 0; i < commands.Length; i++)\n                {\n                    if (string.Compare(commands[i], \"-buildPath\", true) == 0)\n                    {\n                        path = commands[i + 1];\n                        break;\n                    }\n                }\n                if (string.IsNullOrEmpty(path))\n                {\n                    throw new Exception(\"-buildPath is invaild.\");\n                }\n\n                buildPath = path;\n            }\n            catch (Exception)\n            {\n                EditorApplication.Exit((int)ExitCode.Error);\n            }\n        }\n\n        public static string GetPath(BuildTarget target)\n        {\n            string path = buildPath;\n\n            if (target == BuildTarget.StandaloneWindows)\n            {\n                path = Path.Combine(buildPath, $\"{PlayerSettings.productName}.exe\");\n            }\n\n            return path;\n        }\n\n        private static void Build(BuildTarget target, BuildOptions options)\n        {\n            Debug.Log($\"[UnityHelper] Build Task {target} {options}\");\n\n            Debug.Log($\"[UnityHelper] Init\");\n            Init();\n            string outPath = GetPath(target);\n            Debug.Log($\"[UnityHelper] OutPath:{outPath}\");\n            Debug.Log($\"[UnityHelper] Build start ...\");\n            BuildReport report = BuildPipeline.BuildPlayer(EditorBuildSettings.scenes, outPath, target, options);\n            Debug.Log($\"[UnityHelper] Build end .\");\n            ExitCode exitCode = CompleteBuild(report, target);\n            Debug.Log($\"[UnityHelper] Build exit({exitCode}) .\");\n        }\n\n        private static ExitCode CompleteBuild(BuildReport report, BuildTarget standaloneWindows)\n        {\n            BuildSummary summary = report.summary;\n            ExitCode result = ExitCode.Failed;\n            switch (summary.result)\n            {\n                case BuildResult.Unknown:\n                    result = ExitCode.Unknown;\n                    break;\n                case BuildResult.Failed:\n                    result = ExitCode.Failed;\n                    break;\n                case BuildResult.Cancelled:\n                    result = ExitCode.Cancelled;\n                    break;\n                case BuildResult.Succeeded:\n                    result = ExitCode.Succeeded;\n                    break;\n            }\n\n            EditorApplication.Exit((int)result);\n\n            return result;\n        }\n\n        public static void Windows()\n        {\n            Build(BuildTarget.StandaloneWindows, BuildOptions.None);\n        }\n\n        public static void Android()\n        {\n            Build(BuildTarget.Android, BuildOptions.None);\n        }\n\n        public static void IOS()\n        {\n            Build(BuildTarget.iOS, BuildOptions.None);\n        }\n\n        public static void OSX()\n        {\n            Build(BuildTarget.StandaloneOSX, BuildOptions.None);\n        }\n    }\n}\n";
 }
