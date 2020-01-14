@@ -4,7 +4,7 @@
 	"displayName": "UnityHelper",
 	"description": "unity tools for vscode",
 	"license": "MIT",
-	"version": "0.2.6",
+	"version": "0.3.0",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/lieene/unity-tools-vscode.git"
@@ -59,19 +59,19 @@
 				}
 			]
 		},
-		"configuration":[
+		"configuration": [
 			{
 				"title": "Unity Helper",
 				"properties": {
-					"unityhelper.unityexe":{
-						"type":"string",
-						"default":"Unity.exe",
+					"unityhelper.unityexe": {
+						"type": "string",
+						"default": "Unity.exe",
 						"description": "Used to build the unity project",
 						"scope": "window"
 					},
-					"unityhelper.buildpath":{
-						"type":"string",
-						"default":"./build",
+					"unityhelper.buildpath": {
+						"type": "string",
+						"default": "./build",
 						"description": "Output build",
 						"scope": "window"
 					}
