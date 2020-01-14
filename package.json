@@ -19,7 +19,8 @@
 		"onCommand:extension.addunityscript",
 		"onCommand:extension.resetunityscripttemplate",
 		"onCommand:extension.unityappversion",
-		"onCommand:extension.unityprojectupdate"
+		"onCommand:extension.unityprojectupdate",
+		"onCommand:extension.unityprojectbuild"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
@@ -39,6 +40,14 @@
 			{
 				"command": "extension.unityprojectupdate",
 				"title": "Unity Project Update"
+			},
+			{
+				"command": "extension.unityprojectupdate",
+				"title": "Unity Project Update"
+			},
+			{
+				"command": "extension.unityprojectbuild",
+				"title": "Unity Project Build"
 			}
 		],
 		"menus": {
@@ -49,7 +58,26 @@
 					"group": "Add Files"
 				}
 			]
-		}
+		},
+		"configuration":[
+			{
+				"title": "Unity Helper",
+				"properties": {
+					"unityhelper.unityexe":{
+						"type":"string",
+						"default":"Unity.exe",
+						"description": "Used to build the unity project",
+						"scope": "window"
+					},
+					"unityhelper.buildpath":{
+						"type":"string",
+						"default":"./build",
+						"description": "Output build",
+						"scope": "window"
+					}
+				}
+			}
+		]
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
