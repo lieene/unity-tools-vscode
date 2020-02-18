@@ -4,7 +4,7 @@
 	"displayName": "UnityHelper",
 	"description": "unity tools for vscode",
 	"license": "MIT",
-	"version": "0.3.1",
+	"version": "0.3.2",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/lieene/unity-tools-vscode.git"
@@ -62,7 +62,6 @@
 					"command": "extension.addunityscript",
 					"group": "Add Files@1"
 				},
-				
 				{
 					"when": "",
 					"command": "extension.renameunityscript",
