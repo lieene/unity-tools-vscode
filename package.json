@@ -17,6 +17,7 @@
 	],
 	"activationEvents": [
 		"onCommand:extension.addunityscript",
+		"onCommand:extension.renameunityscript",
 		"onCommand:extension.resetunityscripttemplate",
 		"onCommand:extension.unityappversion",
 		"onCommand:extension.unityprojectupdate",
@@ -28,6 +29,10 @@
 			{
 				"command": "extension.addunityscript",
 				"title": "Add Unity Script"
+			},
+			{
+				"command": "extension.renameunityscript",
+				"title": "Rename Unity Script"
 			},
 			{
 				"command": "extension.resetunityscripttemplate",
@@ -55,7 +60,13 @@
 				{
 					"when": "",
 					"command": "extension.addunityscript",
-					"group": "Add Files"
+					"group": "Add Files@1"
+				},
+				
+				{
+					"when": "",
+					"command": "extension.renameunityscript",
+					"group": "Add Files@2"
 				}
 			]
 		},

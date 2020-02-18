@@ -3,8 +3,8 @@
 // Author: Lieene Guo                                                              //
 // MIT License, Copyright (c) 2019 Lieene@ShadeRealm                               //
 // Created Date: Mon Dec 2 2019                                                    //
-// Last Modified: Tue Jan 14 2020                                                  //
-// Modified By: Peter Xiang                                                        //
+// Last Modified: Tue Feb 18 2020                                                  //
+// Modified By: Lieene Guo                                                         //
 
 
 // The module 'vscode' contains the VS Code extensibility API
@@ -18,7 +18,6 @@ import { UnityProjectBuild } from "./unity-project-build";
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "unityhelper" is now active!');
@@ -29,6 +28,12 @@ export function activate(context: vscode.ExtensionContext) {
 	let addunityscript = vscode.commands.registerCommand('extension.addunityscript', (arg?: any) => {
 		let adder = new AddUnityScript(arg);
 		if (adder.isvalid) { adder.Apply(); }
+	});
+
+	let renameunityscript = vscode.commands.registerCommand('extension.renameunityscript', (arg?: any) => {
+		let renamer = new AddUnityScript(arg);
+		renamer.isRename=true;
+		if (renamer.isvalid) { renamer.Apply(); }
 	});
 
 	let resetunityscripttemplate = vscode.commands.registerCommand('extension.resetunityscripttemplate', (arg?: any) => {
@@ -52,6 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(addunityscript);
+	context.subscriptions.push(renameunityscript);
 	context.subscriptions.push(resetunityscripttemplate);
 	context.subscriptions.push(unityappversion);
 	context.subscriptions.push(unityprojectupdate);

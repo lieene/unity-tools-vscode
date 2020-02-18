@@ -3,15 +3,16 @@
 // Author: Lieene Guo                                                              //
 // MIT License, Copyright (c) 2019 Lieene@ShadeRealm                               //
 // Created Date: Mon Dec 2 2019                                                    //
-// Last Modified: Wed Dec 11 2019                                                  //
-// Modified By: Peter Xiang                                                        //
+// Last Modified: Tue Feb 18 2020                                                  //
+// Modified By: Lieene Guo                                                         //
 
 import * as vscode from "vscode";
-import * as yaml from "js-yaml";
+//import * as yaml from "js-yaml";
 import * as xml from "xml-js";
 import * as fs from "fs";
 import * as Path from "path";
 import { promisify } from "util";
+
 
 export function AddArg(folder: string, isEditor: boolean, template?: string, ...factoryParams: any[])
 {
@@ -25,6 +26,7 @@ const readFile = promisify(fs.readFile);
 
 export class UnityProjectLocator
 {
+  path: string;
   folder: string;
   isvalid: boolean;
   unityProjectRoot: string = '';
@@ -34,9 +36,10 @@ export class UnityProjectLocator
   {
     if (arg)
     {
-      this.folder = Path.normalize(arg.fsPath);
-      if (!fs.lstatSync(this.folder).isDirectory())
-      { this.folder = Path.dirname(this.folder); }
+      this.path = Path.normalize(arg.fsPath);
+      if (!fs.lstatSync(this.path).isDirectory())
+      { this.folder = Path.dirname(this.path); }
+      else { this.folder = this.path; }
       this.isvalid = true;
     }
     else
@@ -44,12 +47,13 @@ export class UnityProjectLocator
       let editor = vscode.window.activeTextEditor;
       if (editor)
       {
-        this.folder = Path.normalize(Path.dirname(editor.document.fileName));
+        this.path = Path.normalize(editor.document.fileName);
+        this.folder = Path.dirname(this.path);
         this.isvalid = true;
       }
       else 
       {
-        this.folder = undefined as any;
+        this.path = this.folder = undefined as any;
         this.isvalid = false;
       }
     }
@@ -87,18 +91,18 @@ export class UnityProjectLocator
 }
 export class AddUnityScript extends UnityProjectLocator
 {
+  isRename: boolean = false;
   basename?: string;
   isEditor: boolean = false;
   template?: string;
   factoryParams?: any[];
 
-  csProjectPath: string = '';
+  //csProjectPath: string = '';
   templatePath: string = '';
 
   constructor(arg?: any)
   {
     super(arg);
-
     if (!this.folder.startsWith(this.unityAssetRoot))
     {
       this.isvalid = false;
@@ -112,29 +116,101 @@ export class AddUnityScript extends UnityProjectLocator
 
   async Apply()
   {
-    this.GetCSprojectName(this.folder)
-      .then(async s =>
-      {
-        if (this.isvalid) 
+    if (this.isRename) { await (this.RenameFile()); }
+    else
+    {
+      this.GetCSprojectName(this.folder)
+        .then(async s =>
         {
-          this.csProjectPath = s;
-          return await this.buildFiles()
-            .then(add => this.writeFiles(...add)
-              .then(path => this.editCSProject(...path)
-                .then(rst => rst)));
-        }
-        else { throw new Error(`invalid add for some reason`); }
-      }).then(toOpen =>
-      {
-        vscode.workspace.openTextDocument(toOpen).then((textDocument) =>
-        {
-          if (!textDocument) { return; }
-          vscode.window.showTextDocument(textDocument).then((editor) =>
+          if (this.isvalid) 
           {
-            if (!editor) { return; }
+            return await this.prepareFileContent()
+              .then(add => this.writeFiles(...add)
+                .then(path => this.editCSProject(s, ...path)
+                  .then(rst => rst)));
+          }
+          else { throw new Error(`invalid add for some reason`); }
+        }).then(toOpen =>
+        {
+          vscode.workspace.openTextDocument(toOpen).then((textDocument) =>
+          {
+            if (!textDocument) { return; }
+            vscode.window.showTextDocument(textDocument).then((editor) =>
+            {
+              if (!editor) { return; }
+            });
           });
-        });
-      }).catch(e => vscode.window.showWarningMessage(e.toString()));
+        }).catch(e => vscode.window.showWarningMessage(e.toString()));
+    }
+  }
+
+  async RenameFile(): Promise<void>
+  {
+    let op: vscode.InputBoxOptions = {} as any;
+    let renameFrom = this.path;
+    op.value = renameFrom;
+    op.valueSelection = [renameFrom.lastIndexOf('\\') + 1, renameFrom.lastIndexOf('.')];
+    op.prompt = "rename file to";
+    op.ignoreFocusOut = true;
+    await vscode.window.showInputBox(op).then(renameTo =>
+    {
+      if (renameTo)
+      {
+        renameTo = Path.normalize(renameTo);
+        if (renameTo !== renameFrom)
+        {
+          // let fromBaseName = Path.basename(renameFrom);
+          // let fromFolder = Path.dirname(renameFrom);
+          let toBaseName = Path.basename(renameTo);
+          let renamingFolder = fs.lstatSync(this.folder).isDirectory();
+          let toFolder = renamingFolder ? renameTo : Path.dirname(renameTo);
+          if (toFolder.startsWith(this.unityAssetRoot))
+          {
+            if (toBaseName.endsWith('.cs'))
+            {
+              if (fs.existsSync(renameTo))
+              { vscode.window.showWarningMessage(`file already exist at: ${renameTo}`); }
+              else
+              {
+                fs.renameSync(renameFrom, renameTo);
+                vscode.window.showInformationMessage(`File renamed: ${renameFrom} =>  ${renameTo}`);
+                if (this.isvalid)
+                {
+                  this.GetCSprojectName(toFolder).then(async csProjPath =>
+                  {
+                    this.editCSProject(csProjPath, renameTo!);
+                  });
+                }
+              }
+            }
+            else if (renamingFolder)
+            {
+              if (fs.existsSync(renameTo))
+              { vscode.window.showWarningMessage(`file already exist at: ${renameTo}`); }
+              else
+              {
+                fs.renameSync(renameFrom, renameTo);
+                vscode.window.showInformationMessage(`File renamed: ${renameFrom} =>  ${renameTo}`);
+                if (this.isvalid)
+                {
+                  this.GetCSprojectName(toFolder).then(async csProjPath =>
+                  {
+                    let xmlSrc = (await readFile(csProjPath)).toString();
+                    let fromRelPath = Path.normalize(Path.relative(this.unityProjectRoot, renameFrom));
+                    let toRelPath = Path.normalize(Path.relative(this.unityProjectRoot, renameTo!));
+                    let fromPtn: RegExp = new RegExp(fromRelPath.replace(/\\/g, "[\\/]+"), 'ig');
+                    xmlSrc = xmlSrc.replace(fromPtn, toRelPath);
+                    fs.writeFileSync(csProjPath, xmlSrc);
+                    vscode.window.showInformationMessage(`Fils in ${csProjPath} moved from ${toRelPath} to ${toRelPath}`);
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
   }
 
   async GetCSprojectName(path: string): Promise<string>
@@ -205,34 +281,32 @@ export class AddUnityScript extends UnityProjectLocator
     return out;
   }
 
-  async editCSProject(...paths: string[]): Promise<string>
+  async editCSProject(csProjectPath: string, ...addFilePaths: string[]): Promise<string>
   {
-    let xmlSrc = (await readFile(this.csProjectPath)).toString();
+    let xmlSrc = (await readFile(csProjectPath)).toString();
     let root = xml.xml2js(xmlSrc);
     let elem = root;
     if (elem) { elem = (elem.elements as xml.Element[]).find((e) => e.name === 'Project')!; }
     if (elem) { elem = (elem.elements as xml.Element[]).find((e) => e.name === 'ItemGroup')!; }
     if (elem)
     {
-      for (let i = 0, len = paths.length; i < len; i++)
+      for (let i = 0, len = addFilePaths.length; i < len; i++)
       {
         let newElem: xml.Element = {} as xml.Element;
         newElem.name = "Compile";
-        newElem.attributes = { Include: Path.relative(this.unityProjectRoot, paths[i]) };
+        newElem.attributes = { Include: Path.relative(this.unityProjectRoot, addFilePaths[i]) };
         newElem.type = "element";
         (elem.elements as xml.Element[]).push(newElem);
       }
       let out = xml.js2xml(root);
-      fs.writeFileSync(this.csProjectPath, out.split('><').join('>\n<'));
-      vscode.window.showInformationMessage([`Fils added to ${Path.basename(this.csProjectPath)}`, ...paths].join("\n\t"));
+      fs.writeFileSync(csProjectPath, out.split('><').join('>\n<'));
+      vscode.window.showInformationMessage([`Fils added to ${Path.basename(csProjectPath)}`, ...addFilePaths].join("\n\t"));
 
-
-      return paths.pop()!;
+      return addFilePaths.pop()!;
     }
     else { return `invalid csporj xml format`; }
   }
-
-  async buildFiles(): Promise<[string, any][]>
+  async prepareFileContent(): Promise<[string, any][]>
   {
     let op: vscode.InputBoxOptions = {} as any;
     op.value = "newscript.cs";
@@ -295,7 +369,7 @@ export class AddUnityScript extends UnityProjectLocator
         }
       }
     }
-    catch (e) { throw new Error("Placeholder script Failed"); }
+    catch (e) { throw new Error("Invalid placeholder script"); }
 
     return [[`${this.folder}\\${filename}`, content]];
   }
@@ -373,6 +447,7 @@ const MonoBehaviourTpl = '//{"NewMono":"$basename"}\nusing UnityEngine;\npublic 
 const EditorTpl = '//{"NewMono":"Data Type Name"}\nusing UnityEngine;\nusing UnityEditor;\n[CustomEditor(typeof(NewMono))]\npublic class NewMonoEditor : Editor\n{\n}';
 const ScriptableObjectTpl = '//{"NewScript":"$basename"}\nusing UnityEngine;\n\npublic class NewScript : ScriptableObject\n{\n}';
 const csharpClassObjectTpl = '//{"NewClass":"$basename","NameSpace":"$MyNameSpace"}\nusing UnityEngine;\nnamespace NameSpace\n{\n  public class NewClass\n  {\n  }\n}';
+
 
 // export function GetUnityProjectFolder(path: string): string | undefined
 // {
