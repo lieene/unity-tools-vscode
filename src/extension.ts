@@ -30,7 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
 		if (adder.isvalid) { adder.Apply(); }
 	});
 
-	let renameunityscript = vscode.commands.registerCommand('extension.renameunityscript', (arg?: any) => {
+	let renameunityscriptorfolder = vscode.commands.registerCommand('extension.renameunityscriptorfolder', (arg?: any) => {
 		let renamer = new AddUnityScript(arg);
 		renamer.isRename=true;
 		if (renamer.isvalid) { renamer.Apply(); }
@@ -57,7 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(addunityscript);
-	context.subscriptions.push(renameunityscript);
+	context.subscriptions.push(renameunityscriptorfolder);
 	context.subscriptions.push(resetunityscripttemplate);
 	context.subscriptions.push(unityappversion);
 	context.subscriptions.push(unityprojectupdate);

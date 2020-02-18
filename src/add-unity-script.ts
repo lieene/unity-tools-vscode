@@ -11,7 +11,7 @@ import * as vscode from "vscode";
 import * as xml from "xml-js";
 import * as fs from "fs";
 import * as Path from "path";
-import { promisify } from "util";
+import { promisify, isString } from "util";
 
 
 export function AddArg(folder: string, isEditor: boolean, template?: string, ...factoryParams: any[])
@@ -175,12 +175,7 @@ export class AddUnityScript extends UnityProjectLocator
                 fs.renameSync(renameFrom, renameTo);
                 vscode.window.showInformationMessage(`File renamed: ${renameFrom} =>  ${renameTo}`);
                 if (this.isvalid)
-                {
-                  this.GetCSprojectName(toFolder).then(async csProjPath =>
-                  {
-                    this.editCSProject(csProjPath, renameTo!);
-                  });
-                }
+                { this.GetCSprojectName(toFolder).then(async csProjPath => { this.editCSProject(csProjPath, [renameFrom, renameTo!]); }); }
               }
             }
             else if (renamingFolder)
@@ -198,7 +193,7 @@ export class AddUnityScript extends UnityProjectLocator
                     let xmlSrc = (await readFile(csProjPath)).toString();
                     let fromRelPath = Path.normalize(Path.relative(this.unityProjectRoot, renameFrom));
                     let toRelPath = Path.normalize(Path.relative(this.unityProjectRoot, renameTo!));
-                    let fromPtn: RegExp = new RegExp(fromRelPath.replace(/\\/g, "[\\/]+"), 'ig');
+                    let fromPtn: RegExp = new RegExp(fromRelPath.replace(/\\/g, "[\\\\/]+"), 'ig');
                     xmlSrc = xmlSrc.replace(fromPtn, toRelPath);
                     fs.writeFileSync(csProjPath, xmlSrc);
                     vscode.window.showInformationMessage(`Fils in ${csProjPath} moved from ${toRelPath} to ${toRelPath}`);
@@ -281,28 +276,56 @@ export class AddUnityScript extends UnityProjectLocator
     return out;
   }
 
-  async editCSProject(csProjectPath: string, ...addFilePaths: string[]): Promise<string>
+  async editCSProject(csProjectPath: string, ...addOrChangeItems: (string | [string, string])[]): Promise<string>
   {
     let xmlSrc = (await readFile(csProjectPath)).toString();
+    for (let i = 0, len = addOrChangeItems.length; i < len; i++)
+    {
+      let item = addOrChangeItems[i];
+      if (isString(item))
+      {
+        let addRelPath = Path.normalize(Path.relative(this.unityProjectRoot, item));
+        let patten = new RegExp(addRelPath.replace(/\\/g, "[\\\\/]+"), 'g');
+        if (xmlSrc.match(patten)) { addOrChangeItems[i] = undefined as any; }
+      }
+      else
+      {
+        let fromRelPath = Path.normalize(Path.relative(this.unityProjectRoot, item[0]));
+        let toRelPath = Path.normalize(Path.relative(this.unityProjectRoot, item[1]));
+        let patten = new RegExp(fromRelPath.replace(/\\/g, "[\\\\/]+"), 'g');
+        if (xmlSrc.match(patten))
+        {
+          xmlSrc = xmlSrc.replace(patten, toRelPath);
+          addOrChangeItems[i] = undefined as any;
+        }
+        else
+        {
+          addOrChangeItems[i] = item[1];
+        }
+      }
+    }
     let root = xml.xml2js(xmlSrc);
     let elem = root;
     if (elem) { elem = (elem.elements as xml.Element[]).find((e) => e.name === 'Project')!; }
     if (elem) { elem = (elem.elements as xml.Element[]).find((e) => e.name === 'ItemGroup')!; }
     if (elem)
     {
-      for (let i = 0, len = addFilePaths.length; i < len; i++)
+      for (let i = 0, len = addOrChangeItems.length; i < len; i++)
       {
-        let newElem: xml.Element = {} as xml.Element;
-        newElem.name = "Compile";
-        newElem.attributes = { Include: Path.relative(this.unityProjectRoot, addFilePaths[i]) };
-        newElem.type = "element";
-        (elem.elements as xml.Element[]).push(newElem);
+        let item: string = addOrChangeItems[i] as string;
+        if (item)
+        {
+          let newElem: xml.Element = {} as xml.Element;
+          newElem.name = "Compile";
+          newElem.attributes = { Include: Path.relative(this.unityProjectRoot, item) };
+          newElem.type = "element";
+          (elem.elements as xml.Element[]).push(newElem);
+        }
       }
       let out = xml.js2xml(root);
       fs.writeFileSync(csProjectPath, out.split('><').join('>\n<'));
-      vscode.window.showInformationMessage([`Fils added to ${Path.basename(csProjectPath)}`, ...addFilePaths].join("\n\t"));
-
-      return addFilePaths.pop()!;
+      vscode.window.showInformationMessage([`Fils added to ${Path.basename(csProjectPath)}`, ...addOrChangeItems].join("\n\t"));
+      return addOrChangeItems.pop() as string;
     }
     else { return `invalid csporj xml format`; }
   }
